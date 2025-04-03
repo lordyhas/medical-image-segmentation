@@ -106,14 +106,14 @@ class YourUNet(CNNBaseModel):
         )
 
     @staticmethod
-    def _residual_block(in_channels, out_channels):
+    def _residual_block(in_channels, out_channels, kernel_size=3):
         # Bloc résiduel avec convolutions séparables
 
         return nn.Sequential(
-            YourUNet._separable_conv(in_channels, out_channels),
+            YourUNet._separable_conv(in_channels, out_channels, kernel_size),
             nn.ReLU(),
             nn.BatchNorm2d(out_channels),
-            YourUNet._separable_conv(out_channels, out_channels),
+            YourUNet._separable_conv(out_channels, out_channels, kernel_size),
             nn.ReLU(),
             nn.BatchNorm2d(out_channels)
         )
@@ -143,8 +143,8 @@ class YourUNet(CNNBaseModel):
         Building block of the contracting part
         """
         return nn.Sequential(
-            YourUNet._residual_block(in_channels, out_channels),
-            YourUNet._residual_block(out_channels, out_channels)
+            YourUNet._residual_block(in_channels, out_channels, kernel_size),
+            YourUNet._residual_block(out_channels, out_channels, kernel_size)
         )
 
     @staticmethod
@@ -154,8 +154,8 @@ class YourUNet(CNNBaseModel):
         """
         return nn.Sequential(
             nn.MaxPool2d(kernel_size=2),
-            YourUNet._residual_block(in_channels, out_channels),
-            YourUNet._residual_block(out_channels, out_channels)
+            YourUNet._residual_block(in_channels, out_channels, kernel_size),
+            YourUNet._residual_block(out_channels, out_channels, kernel_size)
         )
 
     @staticmethod
