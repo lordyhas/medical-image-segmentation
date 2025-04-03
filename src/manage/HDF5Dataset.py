@@ -14,7 +14,7 @@ import random
 import numpy as np
 import torch
 from torch.utils import data
-from utils.utils import centered_resize
+from src.utils.utils import centered_resize
 
 
 class HDF5Dataset(data.Dataset):

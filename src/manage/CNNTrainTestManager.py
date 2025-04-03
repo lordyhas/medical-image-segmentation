@@ -11,14 +11,17 @@ Other: Suggestions are welcome
 import warnings
 import torch
 import numpy as np
-from manage.DataManager import DataManager
+
 from typing import Callable, Type
 from tqdm import tqdm
-from models.UNet import UNet
-from models.yourUNet import YourUNet
-from models.yourSegNet import YourSegNet
-from utils.utils import mean_dice, convert_mask_to_rgb_image
+
+from src.manage.DataManager import DataManager
+from src.models.UNet import UNet
+from src.models.yourUNet import YourUNet
+from src.models.yourSegNet import YourSegNet
+from src.utils.utils import mean_dice, convert_mask_to_rgb_image
 import matplotlib.pyplot as plt
+
 
 
 class CNNTrainTestManager(object):

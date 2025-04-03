@@ -10,8 +10,9 @@ Other: Suggestions are welcome
 
 import torch.nn as nn
 import torch.nn.functional as F
-from CNNBaseModel import CNNBaseModel
-from CNNBlocks import ResidualBlock
+
+from src.models.CNNBaseModel import CNNBaseModel
+from src.models.CNNBlocks import ResidualBlock
 
 
 class ResNet(CNNBaseModel):
