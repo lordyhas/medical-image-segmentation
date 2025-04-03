@@ -15,14 +15,16 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torchvision.transforms as transforms
-from manage.CNNTrainTestManager import CNNTrainTestManager, optimizer_setup
-from manage.HDF5Dataset import HDF5Dataset
-from models.AlexNet import AlexNet
-from models.CNNVanilla import CnnVanilla
-from models.ResNet import ResNet
-from models.UNet import UNet
-from models.VggNet import VggNet
+from src.manage.CNNTrainTestManager import CNNTrainTestManager, optimizer_setup
+from src.manage.HDF5Dataset import HDF5Dataset
+from src.models.AlexNet import AlexNet
+from src.models.CNNVanilla import CnnVanilla
+from src.models.ResNet import ResNet
+from src.models.UNet import UNet
+from src.models.VggNet import VggNet
 from torchvision import datasets
+
+
 
 
 def argument_parser():
@@ -74,7 +76,7 @@ if __name__ == "__main__":
         print('Data augmentation NOT activated!')
 
     # set hdf5 path according your hdf5 file location
-    acdc_hdf5_file = '../data/ift780_acdc.hdf5'
+    acdc_hdf5_file = 'data/ift780_acdc.hdf5'
 
     # Transform is used to normalize data among others
     acdc_base_transform = transforms.Compose([
