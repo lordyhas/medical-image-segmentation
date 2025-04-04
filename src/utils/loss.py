@@ -20,7 +20,7 @@ class DiceLoss(nn.Module):
         # cibles en one-hot encoding
         targets = F.one_hot(targets, num_classes=predictions.size(1)).float()
 
-
+        # Calculer la perte Dice pour chaque classe
         dice_loss = 0
         for i in range(predictions.size(1)):
             pred = predictions[:, i:i + 1]
@@ -32,7 +32,7 @@ class DiceLoss(nn.Module):
 
         dice_loss = dice_loss / predictions.size(1)
 
-
+        # Combiner avec l'entropie croisée
         ce_loss = F.cross_entropy(predictions, targets.argmax(dim=1))
 
         return 0.5 * dice_loss + 0.5 * ce_loss
