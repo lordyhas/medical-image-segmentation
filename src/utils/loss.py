@@ -37,24 +37,20 @@ class DiceLoss(nn.Module):
 
         return 0.5 * dice_loss + 0.5 * ce_loss
 
+
 class FocalLoss(nn.Module):
     """
-    Fonction de perte Focal pour YourUNet
-    Conçue pour traiter le déséquilibre entre les classes
+    Fonction de perte Focal pour YourSegNet
+    Utile pour gérer le déséquilibre des classes
     """
 
-    def __init__(self, alpha=1.0, gamma=2.0, smooth=1e-6):
+    def __init__(self, alpha=1, gamma=2):
         super(FocalLoss, self).__init__()
-        self.alpha = alpha # pour équilibrer les classes
-        self.gamma = gamma # pour ajuster la focalisation
-        self.smooth = smooth
+        self.alpha = alpha  # pour équilibrer les classes
+        self.gamma = gamma  # pour ajuster la focalisation
 
     def forward(self, predictions, targets):
-        predictions = F.softmax(predictions, dim=1)
-        targets = F.one_hot(targets, num_classes=predictions.size(1)).float()
-
-        BCE_loss = F.binary_cross_entropy(predictions, targets, reduction='none')
-        pt = torch.exp(-BCE_loss)
-        F_loss = self.alpha * (1 - pt) ** self.gamma * BCE_loss
-
-        return F_loss.mean()
+        ce_loss = F.cross_entropy(predictions, targets, reduction='none')
+        pt = torch.exp(-ce_loss)
+        focal_loss = self.alpha * (1 - pt) ** self.gamma * ce_loss
+        return focal_loss.mean()
