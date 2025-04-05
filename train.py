@@ -22,8 +22,11 @@ from src.models.CNNVanilla import CnnVanilla
 from src.models.ResNet import ResNet
 from src.models.UNet import UNet
 from src.models.VggNet import VggNet
-from torchvision import datasets
+from src.models.yourUNet import YourUNet
+from src.models.yourSegNet import YourSegNet
+from src.utils.loss import FocalLoss, DiceLoss
 
+from torchvision import datasets
 
 
 
@@ -40,9 +43,10 @@ def argument_parser():
                                                  "on acdc dataset.",
                                      add_help=True)
     parser.add_argument('--model', type=str, default="CnnVanilla",
-                        choices=["CnnVanilla", "VggNet", "AlexNet", "ResNet", "yourUNet", "yourSegNet", "UNet"])
-    parser.add_argument('--dataset', type=str, default="cifar10", choices=["cifar10", "svhn"])
-    parser.add_argument('--loss', type=str, default="CE")
+                        choices=["CnnVanilla", "VggNet", "AlexNet", "ResNet", "YourUNet", "YourSegNet", "UNet"])
+    parser.add_argument('--dataset', type=str, default="cifar10", choices=["cifar10", "svhn", "acdc"])
+    parser.add_argument('--loss', type=str, default="CE", choices=["CE", "Dice", "Focal"],
+                        help="Loss function to use (CE: Cross Entropy, Dice: Dice Loss, Focal: Focal Loss)")
     parser.add_argument('--batch_size', type=int, default=20,
                         help='The size of the training batch')
     parser.add_argument('--optimizer', type=str, default="Adam", choices=["Adam", "SGD"],
@@ -76,7 +80,7 @@ if __name__ == "__main__":
         print('Data augmentation NOT activated!')
 
     # set hdf5 path according your hdf5 file location
-    acdc_hdf5_file = 'data/ift780_acdc.hdf5'
+    acdc_hdf5_file = '../data/ift780_acdc.hdf5'
 
     # Transform is used to normalize data among others
     acdc_base_transform = transforms.Compose([
@@ -115,6 +119,14 @@ if __name__ == "__main__":
     elif args.optimizer == 'Adam':
         optimizer_factory = optimizer_setup(optim.Adam, lr=learning_rate)
 
+    # Sélection de la fonction de perte
+    if args.loss == "CE":
+        loss_fn = nn.CrossEntropyLoss()
+    elif args.loss == "Dice":
+        loss_fn = DiceLoss()
+    elif args.loss == "Focal":
+        loss_fn = FocalLoss()
+
     if args.model == 'CnnVanilla':
         model = CnnVanilla(num_classes=10)
     elif args.model == 'AlexNet':
@@ -123,12 +135,16 @@ if __name__ == "__main__":
         model = VggNet(num_classes=10)
     elif args.model == 'ResNet':
         model = ResNet(num_classes=10)
-    elif args.model == 'yourSegNet':
-        print("Modèle " + args.model + " non implémenté")
-        exit(0)
-    elif args.model == 'yourUNet':
-        print("Modèle " + args.model + " non implémenté")
-        exit(0)
+    elif args.model == 'YourUNet':
+        model = YourUNet(num_classes=4)
+        args.dataset = 'acdc'
+        train_set = HDF5Dataset('train', acdc_hdf5_file, transform=acdc_base_transform)
+        test_set = HDF5Dataset('test', acdc_hdf5_file, transform=acdc_base_transform)
+    elif args.model == 'YourSegNet':
+        model = YourSegNet(num_classes=4)
+        args.dataset = 'acdc'
+        train_set = HDF5Dataset('train', acdc_hdf5_file, transform=acdc_base_transform)
+        test_set = HDF5Dataset('test', acdc_hdf5_file, transform=acdc_base_transform)
     elif args.model == 'UNet':
         model = UNet(num_classes=4)
         args.dataset = 'acdc'
@@ -139,7 +155,7 @@ if __name__ == "__main__":
                                         trainset=train_set,
                                         testset=test_set,
                                         batch_size=batch_size,
-                                        loss_fn=nn.CrossEntropyLoss(),
+                                        loss_fn=loss_fn,
                                         optimizer_factory=optimizer_factory,
                                         validation=val_set,
                                         use_cuda=True)
