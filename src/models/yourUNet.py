@@ -166,7 +166,7 @@ class YourUNet(CNNBaseModel):
         return nn.Sequential(
             YourUNet._residual_block(in_channels, out_channels),
             YourUNet._residual_block(out_channels, out_channels),
-            nn.ConvTranspose2d(out_channels, out_channels, kernel_size=3, stride=2, padding=1, output_padding=1)
+            nn.ConvTranspose2d(out_channels, out_channels, kernel_size=kernel_size, stride=2, padding=1, output_padding=1)
         )
 
     @staticmethod
@@ -175,8 +175,8 @@ class YourUNet(CNNBaseModel):
         Final block of the UNet model
         """
         return nn.Sequential(
-            YourUNet._residual_block(in_channels, mid_channels),
-            YourUNet._residual_block(mid_channels, mid_channels),
+            YourUNet._residual_block(in_channels, mid_channels, kernel_size),
+            YourUNet._residual_block(mid_channels, mid_channels, kernel_size),
             nn.Conv2d(mid_channels, out_channels, 1)
         )
 
