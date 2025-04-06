@@ -10,6 +10,7 @@ Other: Suggestions are welcome
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from src.models.CNNBaseModel import CNNBaseModel
 
 '''
@@ -60,6 +61,9 @@ class YourUNet(CNNBaseModel):
         self.conv_decoder2 = self._expansion_block(384, 128)  # 128 + 128 = 256
         self.final_layer = self._final_block(192, 64, num_classes)  # 64 + 64 = 128
 
+        # Couche supplémentaire pour assurer les bonnes dimensions
+        self.final_conv = nn.Conv2d(num_classes, num_classes, kernel_size=1)
+
     def forward(self, x):
         # Encode
         encode_block1 = self.conv_encoder1(x)
@@ -86,6 +90,9 @@ class YourUNet(CNNBaseModel):
 
         decode_block1 = torch.cat((cat_layer1, encode_block1), 1)
         final_layer = self.final_layer(decode_block1)
+
+        # Nous retournons directement le résultat sans softmax
+        # Le softmax sera appliqué dans la fonction de perte
         return final_layer
 
     @staticmethod
@@ -169,7 +176,7 @@ class YourUNet(CNNBaseModel):
         return nn.Sequential(
             YourUNet._residual_block(in_channels, mid_channels),
             YourUNet._residual_block(mid_channels, mid_channels),
-            nn.Conv2d(mid_channels, out_channels, 1)
+            nn.Conv2d(mid_channels, out_channels, 1)  # Sortie finale avec le nombre de classes
         )
 
 
