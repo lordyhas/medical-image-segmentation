@@ -62,8 +62,13 @@ class CNNTrainTestManager(object):
             self.data_manager = DataManager(trainset, testset, batch_size=batch_size)
         self.loss_fn = loss_fn
         self.model = model
-        self.optimizer = optimizer_factory(self.model)
+
+        # Transférer le modèle et la fonction de perte vers le GPU si disponible
         self.model = self.model.to(self.device)
+        if hasattr(self.loss_fn, 'to'):
+            self.loss_fn = self.loss_fn.to(self.device)
+
+        self.optimizer = optimizer_factory(self.model)
         self.use_cuda = use_cuda
         self.metric_values = {}
 
@@ -71,6 +76,12 @@ class CNNTrainTestManager(object):
         self.checkpoint_dir = checkpoint_dir
         self.best_val_acc = 0.0
         os.makedirs(checkpoint_dir, exist_ok=True)
+
+        # Afficher la taille du modèle (nombre de paramètres)
+        total_params = sum(p.numel() for p in self.model.parameters())
+        trainable_params = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
+        print(f"Total des paramètres: {total_params:,}")
+        print(f"Paramètres entraînables: {trainable_params:,}")
 
     def save_checkpoint(self, epoch, is_best=False):
         """
@@ -86,7 +97,8 @@ class CNNTrainTestManager(object):
             'val_acc': self.metric_values['val_acc'][-1],
             'train_acc': self.metric_values['train_acc'][-1],
             'val_loss': self.metric_values['val_loss'][-1],
-            'train_loss': self.metric_values['train_loss'][-1]
+            'train_loss': self.metric_values['train_loss'][-1],
+            'device': str(self.device)
         }
 
         # Sauvegarde du checkpoint de l'époque
@@ -104,9 +116,20 @@ class CNNTrainTestManager(object):
         Args:
             checkpoint_path: chemin vers le fichier de checkpoint
         """
-        checkpoint = torch.load(checkpoint_path)
+        # Assurer le chargement sur le bon dispositif
+        map_location = self.device
+        checkpoint = torch.load(checkpoint_path, map_location=map_location)
         self.model.load_state_dict(checkpoint['model_state_dict'])
         self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+
+        # Si le checkpoint a été sauvegardé sur GPU mais chargé sur CPU, ajuster les états de l'optimiseur
+        if 'device' in checkpoint and checkpoint['device'] != str(self.device):
+            for state in self.optimizer.state.values():
+                for k, v in state.items():
+                    if isinstance(v, torch.Tensor):
+                        state[k] = v.to(self.device)
+
+        print(f"Checkpoint chargé depuis l'époque {checkpoint['epoch']}")
         return checkpoint['epoch']
 
     def evaluate_on_validation_set(self):
