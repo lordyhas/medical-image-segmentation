@@ -55,10 +55,10 @@ class YourUNet(CNNBaseModel):
                                                    kernel_size=3, stride=2, padding=1, output_padding=1)
 
         # Decoder
-        self.conv_decoder4 = self._expansion_block(1024, 512)
-        self.conv_decoder3 = self._expansion_block(512, 256)
-        self.conv_decoder2 = self._expansion_block(256, 128)
-        self.final_layer = self._final_block(128, 64, num_classes)
+        self.conv_decoder4 = self._expansion_block(1024, 512)  # 512 + 512 = 1024
+        self.conv_decoder3 = self._expansion_block(768, 256)  # 256 + 256 = 512
+        self.conv_decoder2 = self._expansion_block(384, 128)  # 128 + 128 = 256
+        self.final_layer = self._final_block(192, 64, num_classes)  # 64 + 64 = 128
 
     def forward(self, x):
         # Encode
@@ -99,15 +99,15 @@ class YourUNet(CNNBaseModel):
         )
 
     @staticmethod
-    def _residual_block(in_channels, out_channels, kernel_size=3):
+    def _residual_block(in_channels, out_channels):
         """
         Bloc résiduel avec convolutions séparables
         """
         return nn.Sequential(
-            YourUNet._separable_conv(in_channels, out_channels, kernel_size),
+            YourUNet._separable_conv(in_channels, out_channels),
             nn.ReLU(),
             nn.BatchNorm2d(out_channels),
-            YourUNet._separable_conv(out_channels, out_channels, kernel_size),
+            YourUNet._separable_conv(out_channels, out_channels),
             nn.ReLU(),
             nn.BatchNorm2d(out_channels)
         )
@@ -118,8 +118,8 @@ class YourUNet(CNNBaseModel):
         Bloc de convolution avec connexions résiduelles
         """
         return nn.Sequential(
-            YourUNet._residual_block(in_channels, out_channels, kernel_size),
-            YourUNet._residual_block(out_channels, out_channels, kernel_size)
+            YourUNet._residual_block(in_channels, out_channels),
+            YourUNet._residual_block(out_channels, out_channels)
         )
 
     @staticmethod
@@ -129,12 +129,12 @@ class YourUNet(CNNBaseModel):
         """
         return nn.Sequential(
             nn.MaxPool2d(kernel_size=2),
-            YourUNet._residual_block(in_channels, out_channels, kernel_size),
-            YourUNet._residual_block(out_channels, out_channels, kernel_size)
+            YourUNet._residual_block(in_channels, out_channels),
+            YourUNet._residual_block(out_channels, out_channels)
         )
 
     @staticmethod
-    def _bottleneck_block(in_channels, out_channels, kernel_size=3):
+    def _bottleneck_block(in_channels, out_channels):
         """
         Bloc bottleneck pour réduire la dimensionnalité
         """
@@ -142,7 +142,7 @@ class YourUNet(CNNBaseModel):
             nn.Conv2d(in_channels, out_channels // 4, 1),
             nn.ReLU(),
             nn.BatchNorm2d(out_channels // 4),
-            YourUNet._separable_conv(out_channels // 4, out_channels // 4, kernel_size),
+            YourUNet._separable_conv(out_channels // 4, out_channels // 4),
             nn.ReLU(),
             nn.BatchNorm2d(out_channels // 4),
             nn.Conv2d(out_channels // 4, out_channels, 1),
@@ -156,8 +156,8 @@ class YourUNet(CNNBaseModel):
         Bloc d'expansion avec convolutions séparables
         """
         return nn.Sequential(
-            YourUNet._residual_block(in_channels, out_channels, kernel_size),
-            YourUNet._residual_block(out_channels, out_channels, kernel_size),
+            YourUNet._residual_block(in_channels, out_channels),
+            YourUNet._residual_block(out_channels, out_channels),
             nn.ConvTranspose2d(out_channels, out_channels, kernel_size=3, stride=2, padding=1, output_padding=1)
         )
 
@@ -167,8 +167,8 @@ class YourUNet(CNNBaseModel):
         Bloc final avec convolutions séparables
         """
         return nn.Sequential(
-            YourUNet._residual_block(in_channels, mid_channels, kernel_size),
-            YourUNet._residual_block(mid_channels, mid_channels, kernel_size),
+            YourUNet._residual_block(in_channels, mid_channels),
+            YourUNet._residual_block(mid_channels, mid_channels),
             nn.Conv2d(mid_channels, out_channels, 1)
         )
 
