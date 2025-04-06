@@ -24,9 +24,9 @@ mais comprenant des connexions résiduelles et denses.  Soyez originaux et surto
 class YourUNet(CNNBaseModel):
     """
     Version améliorée du UNet avec :
-    - Couches résiduelles
     - Convolutions séparables
-    - Couches bottleneck
+    - Couches résiduelles
+    - Blocs bottleneck
     """
 
     def __init__(self, num_classes=4, init_weights=True):
@@ -48,17 +48,17 @@ class YourUNet(CNNBaseModel):
         self.conv_encoder5 = self._contraction_block(512, 1024)
 
         # Bottleneck
-        self.bottleneck = self._bottleneck_block(1024, 2048)
+        self.bottleneck = self._bottleneck_block(1024, 1024)
 
         # Middle
-        self.conv_mid_decoder = nn.ConvTranspose2d(in_channels=2048, out_channels=1024,
+        self.conv_mid_decoder = nn.ConvTranspose2d(in_channels=1024, out_channels=512,
                                                    kernel_size=3, stride=2, padding=1, output_padding=1)
 
         # Decoder
-        self.conv_decoder4 = self._expansion_block(2048, 512)
-        self.conv_decoder3 = self._expansion_block(1024, 256)
-        self.conv_decoder2 = self._expansion_block(512, 128)
-        self.final_layer = self._final_block(256, 128, num_classes)
+        self.conv_decoder4 = self._expansion_block(1024, 512)
+        self.conv_decoder3 = self._expansion_block(512, 256)
+        self.conv_decoder2 = self._expansion_block(256, 128)
+        self.final_layer = self._final_block(128, 64, num_classes)
 
     def forward(self, x):
         # Encode
@@ -88,18 +88,11 @@ class YourUNet(CNNBaseModel):
         final_layer = self.final_layer(decode_block1)
         return final_layer
 
-
-    # ------------------------------------------------------------
-    # Nouvelles fonctions (caractéristiques nouvelles)
-    # - Convolutions séparables
-    # - Connexions résiduelles
-    # - Bottleneck
-    # ------------------------------------------------------------
-
     @staticmethod
     def _separable_conv(in_channels, out_channels, kernel_size=3):
-        # Implémente une convolution séparable (depthwise + pointwise)
-
+        """
+        Implémente une convolution séparable (depthwise + pointwise)
+        """
         return nn.Sequential(
             nn.Conv2d(in_channels, in_channels, kernel_size, padding=kernel_size // 2, groups=in_channels),
             nn.Conv2d(in_channels, out_channels, 1)
@@ -107,8 +100,9 @@ class YourUNet(CNNBaseModel):
 
     @staticmethod
     def _residual_block(in_channels, out_channels, kernel_size=3):
-        # Bloc résiduel avec convolutions séparables
-
+        """
+        Bloc résiduel avec convolutions séparables
+        """
         return nn.Sequential(
             YourUNet._separable_conv(in_channels, out_channels, kernel_size),
             nn.ReLU(),
@@ -119,28 +113,9 @@ class YourUNet(CNNBaseModel):
         )
 
     @staticmethod
-    def _bottleneck_block(in_channels, out_channels):
-
-        # Bloc bottleneck pour réduire la dimensionnalité
-
-        return nn.Sequential(
-            nn.Conv2d(in_channels, out_channels // 4, 1),
-            nn.ReLU(),
-            nn.BatchNorm2d(out_channels // 4),
-            YourUNet._separable_conv(out_channels // 4, out_channels // 4),
-            nn.ReLU(),
-            nn.BatchNorm2d(out_channels // 4),
-            nn.Conv2d(out_channels // 4, out_channels, 1),
-            nn.ReLU(),
-            nn.BatchNorm2d(out_channels)
-        )
-
-    # ------------------------------------------------------------
-
-    @staticmethod
     def _conv_block(in_channels, out_channels, kernel_size=3):
         """
-        Building block of the contracting part
+        Bloc de convolution avec connexions résiduelles
         """
         return nn.Sequential(
             YourUNet._residual_block(in_channels, out_channels, kernel_size),
@@ -150,7 +125,7 @@ class YourUNet(CNNBaseModel):
     @staticmethod
     def _contraction_block(in_channels, out_channels, kernel_size=3):
         """
-        Building block of the contracting part
+        Bloc de contraction avec convolutions séparables
         """
         return nn.Sequential(
             nn.MaxPool2d(kernel_size=2),
@@ -159,20 +134,37 @@ class YourUNet(CNNBaseModel):
         )
 
     @staticmethod
-    def _expansion_block(in_channels, out_channels, kernel_size=3):
+    def _bottleneck_block(in_channels, out_channels, kernel_size=3):
         """
-        Building block of the expansion part
+        Bloc bottleneck pour réduire la dimensionnalité
         """
         return nn.Sequential(
-            YourUNet._residual_block(in_channels, out_channels),
-            YourUNet._residual_block(out_channels, out_channels),
-            nn.ConvTranspose2d(out_channels, out_channels, kernel_size=kernel_size, stride=2, padding=1, output_padding=1)
+            nn.Conv2d(in_channels, out_channels // 4, 1),
+            nn.ReLU(),
+            nn.BatchNorm2d(out_channels // 4),
+            YourUNet._separable_conv(out_channels // 4, out_channels // 4, kernel_size),
+            nn.ReLU(),
+            nn.BatchNorm2d(out_channels // 4),
+            nn.Conv2d(out_channels // 4, out_channels, 1),
+            nn.ReLU(),
+            nn.BatchNorm2d(out_channels)
+        )
+
+    @staticmethod
+    def _expansion_block(in_channels, out_channels, kernel_size=3):
+        """
+        Bloc d'expansion avec convolutions séparables
+        """
+        return nn.Sequential(
+            YourUNet._residual_block(in_channels, out_channels, kernel_size),
+            YourUNet._residual_block(out_channels, out_channels, kernel_size),
+            nn.ConvTranspose2d(out_channels, out_channels, kernel_size=3, stride=2, padding=1, output_padding=1)
         )
 
     @staticmethod
     def _final_block(in_channels, mid_channels, out_channels, kernel_size=3):
         """
-        Final block of the UNet model
+        Bloc final avec convolutions séparables
         """
         return nn.Sequential(
             YourUNet._residual_block(in_channels, mid_channels, kernel_size),
