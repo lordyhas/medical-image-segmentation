@@ -11,11 +11,10 @@ Other: Suggestions are welcome
 import warnings
 import torch
 import numpy as np
-
+import os
+from src.manage.DataManager import DataManager
 from typing import Callable, Type
 from tqdm import tqdm
-
-from src.manage.DataManager import DataManager
 from src.models.UNet import UNet
 from src.models.yourUNet import YourUNet
 from src.models.yourSegNet import YourSegNet
@@ -23,10 +22,9 @@ from src.utils.utils import mean_dice, convert_mask_to_rgb_image
 import matplotlib.pyplot as plt
 
 
-
 class CNNTrainTestManager(object):
     """
-    Class used the train and test the given model in the parameters 
+    Class used the train and test the given model in the parameters
     """
 
     def __init__(self, model,
@@ -36,7 +34,8 @@ class CNNTrainTestManager(object):
                  optimizer_factory: Callable[[torch.nn.Module], torch.optim.Optimizer],
                  batch_size=1,
                  validation=None,
-                 use_cuda=False):
+                 use_cuda=False,
+                 checkpoint_dir='checkpoints'):
         """
         Args:
             model: model to train
@@ -47,8 +46,8 @@ class CNNTrainTestManager(object):
             below for more details
             validation: wether to use custom validation data or let the one by default
             use_cuda: to Use the gpu to train the model
+            checkpoint_dir: directory to save model checkpoints
         """
-
         device_name = 'cuda:0' if use_cuda else 'cpu'
         if use_cuda and not torch.cuda.is_available():
             warnings.warn("CUDA is not available. Suppress this warning by passing "
@@ -67,6 +66,94 @@ class CNNTrainTestManager(object):
         self.model = self.model.to(self.device)
         self.use_cuda = use_cuda
         self.metric_values = {}
+
+        # Initialisation du checkpointing
+        self.checkpoint_dir = checkpoint_dir
+        self.best_val_acc = 0.0
+        os.makedirs(checkpoint_dir, exist_ok=True)
+
+    def save_checkpoint(self, epoch, is_best=False):
+        """
+        Sauvegarde un checkpoint du modèle
+        Args:
+            epoch: numéro de l'époque actuelle
+            is_best: si True, sauvegarde comme meilleur modèle
+        """
+        checkpoint = {
+            'epoch': epoch,
+            'model_state_dict': self.model.state_dict(),
+            'optimizer_state_dict': self.optimizer.state_dict(),
+            'val_acc': self.metric_values['val_acc'][-1],
+            'train_acc': self.metric_values['train_acc'][-1],
+            'val_loss': self.metric_values['val_loss'][-1],
+            'train_loss': self.metric_values['train_loss'][-1]
+        }
+
+        # Sauvegarde du checkpoint de l'époque
+        torch.save(checkpoint, os.path.join(self.checkpoint_dir, f'checkpoint_epoch_{epoch}.pth'))
+
+        # Si c'est le meilleur modèle, on le sauvegarde séparément
+        if is_best:
+            torch.save(checkpoint, os.path.join(self.checkpoint_dir, 'best_model.pth'))
+            print(
+                f'Nouveau meilleur modèle sauvegardé avec une précision de validation de {self.metric_values["val_acc"][-1]:.3f}')
+
+    def load_checkpoint(self, checkpoint_path):
+        """
+        Charge un checkpoint du modèle
+        Args:
+            checkpoint_path: chemin vers le fichier de checkpoint
+        """
+        checkpoint = torch.load(checkpoint_path)
+        self.model.load_state_dict(checkpoint['model_state_dict'])
+        self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        return checkpoint['epoch']
+
+    def evaluate_on_validation_set(self):
+        """
+        function that evaluate the model on the validation set every epoch
+        """
+        # switch to eval mode so that layers like batchnorm's layers nor dropout's layers
+        # works in eval mode instead of training mode
+        self.model.eval()
+
+        # Get validation data
+        val_loader = self.data_manager.get_validation_set()
+        validation_loss = 0.0
+        validation_losses = []
+        validation_accuracies = []
+
+        with torch.no_grad():
+            for j, val_data in enumerate(val_loader, 0):
+                # transfer tensors to the selected device
+                val_inputs, val_labels = val_data[0].to(self.device), val_data[1].to(self.device)
+
+                # forward pass
+                val_outputs = self.model(val_inputs)
+
+                # compute loss function
+                loss = self.loss_fn(val_outputs, val_labels)
+                validation_losses.append(loss.item())
+                validation_accuracies.append(self.accuracy(val_outputs, val_labels))
+                validation_loss += loss.item()
+
+        self.metric_values['val_loss'].append(np.mean(validation_losses))
+        self.metric_values['val_acc'].append(np.mean(validation_accuracies))
+
+        # Vérifie si c'est le meilleur modèle
+        current_val_acc = np.mean(validation_accuracies)
+        is_best = current_val_acc > self.best_val_acc
+        if is_best:
+            self.best_val_acc = current_val_acc
+
+        # displays metrics
+        print('Validation loss %.3f' % (validation_loss / len(val_loader)))
+        print('Validation accuracy %.3f' % (np.mean(validation_accuracies)))
+
+        # switch back to train mode
+        self.model.train()
+
+        return is_best
 
     def train(self, num_epochs):
         """
@@ -124,53 +211,19 @@ class CNNTrainTestManager(object):
                     # print metrics along progress bar
                     train_loss += loss.item()
                     train_acc += acc
-                    #t.set_postfix({loss='{:05.3f}'.format(train_loss / (i + 1))})
-                    t.set_postfix({'Train loss': train_loss / (i + 1), "train_acc":  train_acc / (i + 1)})
+                    # t.set_postfix({loss='{:05.3f}'.format(train_loss / (i + 1))})
+                    t.set_postfix({'Train loss': train_loss / (i + 1), "train_acc": train_acc / (i + 1)})
                     t.update()
+
             # evaluate the model on validation data after each epoch
             self.metric_values['train_loss'].append(np.mean(train_losses))
             self.metric_values['train_acc'].append(np.mean(train_accuracies))
-            self.evaluate_on_validation_set()
+            is_best = self.evaluate_on_validation_set()
+
+            # Sauvegarde du checkpoint
+            self.save_checkpoint(epoch, is_best)
 
         print("Finished training.")
-
-    def evaluate_on_validation_set(self):
-        """
-        function that evaluate the model on the validation set every epoch
-        """
-        # switch to eval mode so that layers like batchnorm's layers nor dropout's layers
-        # works in eval mode instead of training mode
-        self.model.eval()
-
-        # Get validation data
-        val_loader = self.data_manager.get_validation_set()
-        validation_loss = 0.0
-        validation_losses = []
-        validation_accuracies = []
-
-        with torch.no_grad():
-            for j, val_data in enumerate(val_loader, 0):
-                # transfer tensors to the selected device
-                val_inputs, val_labels = val_data[0].to(self.device), val_data[1].to(self.device)
-
-                # forward pass
-                val_outputs = self.model(val_inputs)
-
-                # compute loss function
-                loss = self.loss_fn(val_outputs, val_labels)
-                validation_losses.append(loss.item())
-                validation_accuracies.append(self.accuracy(val_outputs, val_labels))
-                validation_loss += loss.item()
-
-        self.metric_values['val_loss'].append(np.mean(validation_losses))
-        self.metric_values['val_acc'].append(np.mean(validation_accuracies))
-
-        # displays metrics
-        print('Validation loss %.3f' % (validation_loss / len(val_loader)))
-        print('Validation accuracy %.3f' % (np.mean(validation_accuracies)))
-
-        # switch back to train mode
-        self.model.train()
 
     def accuracy(self, outputs, labels):
         """
@@ -295,7 +348,7 @@ class CNNTrainTestManager(object):
             ax4.axis('off')
 
             # Save as a png image
-            f.savefig('fig{}.png'.format(it+1))
+            f.savefig('fig{}.png'.format(it + 1))
             # show image
             plt.show()
 
