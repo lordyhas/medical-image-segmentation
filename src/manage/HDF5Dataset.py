@@ -22,7 +22,7 @@ class HDF5Dataset(data.Dataset):
     class that loads hdf5 dataset object
     """
 
-    def __init__(self, set, file_path, input_size: int = 256, transform=None):
+    def __init__(self, set, file_path, input_size: int = 256, transform=None, num_classes=4):
         """
         Args:
         """
@@ -30,6 +30,7 @@ class HDF5Dataset(data.Dataset):
         self.set = set
         self.input_size = input_size
         self.transform = transform
+        self.num_classes = num_classes
         self.data = self._load_data()
 
         with h5py.File(self.file_path, 'r') as f:
@@ -91,12 +92,8 @@ class HDF5Dataset(data.Dataset):
             # To apply the same transformations (RandomFlip, RandomCrop) on both image and ground truth
             # we need to fix the seed to make those functions return same value when using random
 
-            # fix a random seed
-            #seed = np.random.randint(0, 2 ** 32)
-
             # fix a random seed (using a smaller range to avoid int32 overflow)
             seed = np.random.randint(0, 1000000)
-            # print(seed)
             torch.manual_seed(seed)
             # pass image and ground truth trough transform for data augmentation and normalization purposes
             random.seed(seed)
@@ -106,9 +103,15 @@ class HDF5Dataset(data.Dataset):
         else:
             img_slice = torch.from_numpy(img_slice)
             gt_slice = torch.from_numpy(gt_slice)
+
         # ground truth must be encoded in categorical form instead of one_hot vector
         # in order to allow pytorch's CrossEntropy to compute the loss
-        return img_slice, np.argmax(gt_slice, axis=0)
+        # Assurons-nous que les étiquettes sont toujours dans la plage valide [0, num_classes-1]
+        gt_categorical = np.argmax(gt_slice, axis=0)
+        # Remplacer les valeurs en dehors de la plage par 0 (fond)
+        gt_categorical = np.clip(gt_categorical, 0, self.num_classes - 1)
+
+        return img_slice, gt_categorical
 
     def __len__(self):
         """

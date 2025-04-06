@@ -11,31 +11,44 @@ class DiceLoss(nn.Module):
 
     def __init__(self, smooth=1.0):
         super(DiceLoss, self).__init__()
-        self.smooth = smooth # pour éviter la division par zéro
+        self.smooth = smooth
 
     def forward(self, predictions, targets):
+        # S'assurer que les prédictions ont la bonne forme
+        if len(predictions.shape) == 4:
+            # Assurer que les cibles sont des entiers valides dans la plage [0, num_classes-1]
+            num_classes = predictions.size(1)
+            targets = torch.clamp(targets, min=0, max=num_classes - 1)
 
-        predictions = F.softmax(predictions, dim=1)
+            # Appliquer softmax pour obtenir les probabilités
+            predictions_softmax = F.softmax(predictions, dim=1)
 
-        # cibles en one-hot encoding
-        targets = F.one_hot(targets, num_classes=predictions.size(1)).float()
+            # Convertir les cibles en one-hot encoding avec permutation des dimensions
+            # Reshape pour correspondre à la dimension attendue [B, C, H, W]
+            targets_one_hot = F.one_hot(targets.long(), num_classes=num_classes).permute(0, 3, 1, 2).float()
 
-        # Calculer la perte Dice pour chaque classe
-        dice_loss = 0
-        for i in range(predictions.size(1)):
-            pred = predictions[:, i:i + 1]
-            target = targets[:, i:i + 1]
+            # Calculer la perte Dice pour chaque classe
+            dice_loss = 0
+            for i in range(predictions.size(1)):
+                pred = predictions_softmax[:, i, :, :]
+                target = targets_one_hot[:, i, :, :]
 
-            intersection = (pred * target).sum()
-            dice = (2. * intersection + self.smooth) / (pred.sum() + target.sum() + self.smooth)
-            dice_loss += 1 - dice
+                intersection = (pred * target).sum()
+                union = pred.sum() + target.sum()
 
-        dice_loss = dice_loss / predictions.size(1)
+                # Éviter la division par zéro
+                dice = (2. * intersection + self.smooth) / (union + self.smooth)
+                dice_loss += 1 - dice
 
-        # Combiner avec l'entropie croisée
-        ce_loss = F.cross_entropy(predictions, targets.argmax(dim=1))
+            # Moyenne sur toutes les classes
+            dice_loss = dice_loss / predictions.size(1)
 
-        return 0.5 * dice_loss + 0.5 * ce_loss
+            # Calculer l'entropie croisée avec les cibles vérifiées
+            ce_loss = F.cross_entropy(predictions, targets.long())
+
+            return 0.5 * dice_loss + 0.5 * ce_loss
+        else:
+            raise ValueError("Les prédictions doivent avoir 4 dimensions [B, C, H, W]")
 
 
 class FocalLoss(nn.Module):
@@ -46,11 +59,15 @@ class FocalLoss(nn.Module):
 
     def __init__(self, alpha=1, gamma=2):
         super(FocalLoss, self).__init__()
-        self.alpha = alpha  # pour équilibrer les classes
-        self.gamma = gamma  # pour ajuster la focalisation
+        self.alpha = alpha
+        self.gamma = gamma
 
     def forward(self, predictions, targets):
-        ce_loss = F.cross_entropy(predictions, targets, reduction='none')
+        # S'assurer que les cibles sont des entiers valides
+        num_classes = predictions.size(1)
+        targets = torch.clamp(targets, min=0, max=num_classes - 1)
+
+        ce_loss = F.cross_entropy(predictions, targets.long(), reduction='none')
         pt = torch.exp(-ce_loss)
         focal_loss = self.alpha * (1 - pt) ** self.gamma * ce_loss
         return focal_loss.mean()
