@@ -67,9 +67,9 @@ class YourSegNet(CNNBaseModel):
 
         # Decoder avec skip connections asymétriques
         d4 = self.decoder4(e5)
-        d3 = self.decoder3(d4 + e3)  # Skip connection asymétrique
-        d2 = self.decoder2(d3 + e2)  # Skip connection asymétrique
-        d1 = self.decoder1(d2 + e1)  # Skip connection asymétrique
+        d3 = self.decoder3(d4 + e3)
+        d2 = self.decoder2(d3 + e2)
+        d1 = self.decoder1(d2 + e1)
 
         return self.final(d1)
 
