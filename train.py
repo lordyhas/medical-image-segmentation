@@ -26,7 +26,7 @@ from src.models.UNet import UNet
 from src.models.VggNet import VggNet
 from src.models.yourUNet import YourUNet
 from src.models.yourSegNet import YourSegNet
-from src.utils.loss import FocalLoss, DiceLoss
+from src.utils.losses import FocalLoss, DiceLoss
 
 from torchvision import datasets
 
