@@ -15,6 +15,8 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torchvision.transforms as transforms
+from torch.nn.parallel import data_parallel
+
 from src.manage.CNNTrainTestManager import CNNTrainTestManager, optimizer_setup
 from src.manage.HDF5Dataset import HDF5Dataset
 from src.models.AlexNet import AlexNet
@@ -80,7 +82,7 @@ if __name__ == "__main__":
         print('Data augmentation NOT activated!')
 
     # set hdf5 path according your hdf5 file location
-    acdc_hdf5_file = '../data/ift780_acdc.hdf5'
+    acdc_hdf5_file = 'data/ift780_acdc.hdf5'
 
     # Transform is used to normalize data among others
     acdc_base_transform = transforms.Compose([
@@ -103,16 +105,16 @@ if __name__ == "__main__":
     transform = base_transform
     if data_augment:
         transform = transforms.Compose([data_augment_transform, transform])
-
+    data_path = 'data'
     if args.dataset == 'cifar10':
         # Download the train and test set and apply transform on it
-        train_set = datasets.CIFAR10(root='../data', train=True, download=True, transform=transform)
-        test_set = datasets.CIFAR10(root='../data', train=False, download=True, transform=base_transform)
+        train_set = datasets.CIFAR10(root=data_path, train=True, download=True, transform=transform)
+        test_set = datasets.CIFAR10(root=data_path, train=False, download=True, transform=base_transform)
 
     elif args.dataset == 'svhn':
         # Download the train and test set and apply transform on it
-        train_set = datasets.SVHN(root='../data', split='train', download=True, transform=transform)
-        test_set = datasets.SVHN(root='../data', split='test', download=True, transform=base_transform)
+        train_set = datasets.SVHN(root=data_path, split='train', download=True, transform=transform)
+        test_set = datasets.SVHN(root=data_path, split='test', download=True, transform=base_transform)
 
     if args.optimizer == 'SGD':
         optimizer_factory = optimizer_setup(torch.optim.SGD, lr=learning_rate, momentum=0.9)
