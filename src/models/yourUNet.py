@@ -61,7 +61,7 @@ class YourUNet(CNNBaseModel):
         self.conv_decoder2 = self._expansion_block(384, 128)  # 128 + 128 = 256
         self.final_layer = self._final_block(192, 64, num_classes)  # 64 + 64 = 128
 
-        # Couche supplémentaire pour assurer les bonnes dimensions
+        # Couche supplémentaire pour assurer les bonnes dimensions -
         self.final_conv = nn.Conv2d(num_classes, num_classes, kernel_size=1)
 
     def forward(self, x):
