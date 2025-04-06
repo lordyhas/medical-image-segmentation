@@ -10,26 +10,42 @@ Other: Suggestions are welcome
 """
 
 import argparse
-
 import torch
-import torch.nn as nn
 import torch.optim as optim
+import torch.nn as nn
 import torchvision.transforms as transforms
-from torch.nn.parallel import data_parallel
+from torchvision import datasets
+import numpy as np
 
-from src.manage.CNNTrainTestManager import CNNTrainTestManager, optimizer_setup
-from src.manage.HDF5Dataset import HDF5Dataset
-from src.models.AlexNet import AlexNet
 from src.models.CNNVanilla import CnnVanilla
+# Importation des modèles et des outils
+# from src.utils.preprocess import get_data_loader, get_data_loader_svhn
+#from src.utils.utils import optimizer_setup, create_figure
+
+from src.models.AlexNet import AlexNet
+from src.models.VggNet import VggNet
 from src.models.ResNet import ResNet
 from src.models.UNet import UNet
-from src.models.VggNet import VggNet
 from src.models.yourUNet import YourUNet
 from src.models.yourSegNet import YourSegNet
+from src.manage.HDF5Dataset import HDF5Dataset
+from src.manage.DataManager import DataManager
+from src.manage.CNNTrainTestManager import CNNTrainTestManager, optimizer_setup
 from src.utils.losses import FocalLoss, DiceLoss
 
-from torchvision import datasets
-
+# Vérification et affichage des informations sur le GPU
+print("=" * 50)
+use_cuda = torch.cuda.is_available()
+print(f"CUDA disponible: {use_cuda}")
+if use_cuda:
+    print(f"Nombre de GPUs: {torch.cuda.device_count()}")
+    print(f"GPU utilisé: {torch.cuda.get_device_name(0)}")
+    print(f"Index du GPU actif: {torch.cuda.current_device()}")
+    # Réserver la mémoire GPU pour éviter les fragmentations
+    torch.backends.cudnn.benchmark = True
+else:
+    print("ATTENTION: Aucun GPU détecté! L'entraînement sera effectué sur CPU.")
+print("=" * 50)
 
 
 def argument_parser():
@@ -160,14 +176,21 @@ if __name__ == "__main__":
                                         loss_fn=loss_fn,
                                         optimizer_factory=optimizer_factory,
                                         validation=val_set,
-                                        use_cuda=True)
+                                        use_cuda=use_cuda)
 
     if args.predict is not None:
         model.load_weights(args.predict)
         print("predicting the mask of a randomly selected image from test set")
         model_trainer.plot_image_mask_prediction()
     else:
-        print("Training {} on {} for {} epochs".format(model.__class__.__name__, args.dataset, args.num_epochs))
+        # Afficher des informations sur l'utilisation du GPU
+        if use_cuda:
+            print(
+                f"Entraînement de {model.__class__.__name__} sur {args.dataset} pour {args.num_epochs} époques utilisant GPU: {torch.cuda.get_device_name(0)}")
+        else:
+            print(
+                f"Entraînement de {model.__class__.__name__} sur {args.dataset} pour {args.num_epochs} époques utilisant CPU")
+
         model_trainer.train(num_epochs)
         model_trainer.evaluate_on_test_set()
         if isinstance(model, UNet):
