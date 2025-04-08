@@ -22,6 +22,8 @@ from models.CNNVanilla import CnnVanilla
 from models.ResNet import ResNet
 from models.UNet import UNet
 from models.VggNet import VggNet
+from models.yourUNet import YourUNet
+from models.yourSegNet import YourSegNet
 from torchvision import datasets
 
 
@@ -122,11 +124,9 @@ if __name__ == "__main__":
     elif args.model == 'ResNet':
         model = ResNet(num_classes=10)
     elif args.model == 'yourSegNet':
-        print("Modèle " + args.model + " non implémenté")
-        exit(0)
+        model = YourSegNet(num_classes=4)  
     elif args.model == 'yourUNet':
-        print("Modèle " + args.model + " non implémenté")
-        exit(0)
+        model = YourUNet(num_classes= 4)
     elif args.model == 'UNet':
         model = UNet(num_classes=4)
         args.dataset = 'acdc'
