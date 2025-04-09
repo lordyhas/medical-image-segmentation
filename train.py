@@ -16,6 +16,7 @@ import torch.nn as nn
 import torchvision.transforms as transforms
 from torchvision import datasets
 import numpy as np
+import os
 
 # Importation des modèles et des outils
 # from src.utils.preprocess import get_data_loader, get_data_loader_svhn
@@ -176,6 +177,13 @@ if __name__ == "__main__":
         train_set = HDF5Dataset('train', acdc_hdf5_file, transform=acdc_base_transform)
         test_set = HDF5Dataset('test', acdc_hdf5_file, transform=acdc_base_transform)
 
+    # Créer un répertoire de checkpoint spécifique au modèle
+    checkpoint_dir = f'checkpoints/{args.model}_{args.loss}'
+    if args.max_samples is not None:
+        checkpoint_dir += f'_samples{args.max_samples}'
+    os.makedirs(checkpoint_dir, exist_ok=True)
+    print(f"Les checkpoints seront sauvegardés dans: {checkpoint_dir}")
+
     model_trainer = CNNTrainTestManager(model=model,
                                         trainset=train_set,
                                         testset=test_set,
@@ -183,7 +191,8 @@ if __name__ == "__main__":
                                         loss_fn=loss_fn,
                                         optimizer_factory=optimizer_factory,
                                         validation=val_set,
-                                        use_cuda=use_cuda)
+                                        use_cuda=use_cuda,
+                                        checkpoint_dir=checkpoint_dir)
 
     if args.predict is not None:
         model.load_weights(args.predict)
