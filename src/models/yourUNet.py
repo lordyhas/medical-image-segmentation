@@ -179,6 +179,13 @@ class YourUNet(CNNBaseModel):
             nn.Conv2d(mid_channels, out_channels, 1)  # Sortie finale avec le nombre de classes
         )
 
+    @property
+    def name(self):
+        """
+        Nom du modèle
+        """
+        return "YourUNet"
+
 
 '''
 Fin de votre code.
