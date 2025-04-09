@@ -15,17 +15,13 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torchvision.transforms as transforms
-from manage.CNNTrainTestManager import CNNTrainTestManager, optimizer_setup
-from manage.HDF5Dataset import HDF5Dataset
-from models.AlexNet import AlexNet
-from models.CNNVanilla import CnnVanilla
-from models.ResNet import ResNet
-from models.UNet import UNet
-from models.VggNet import VggNet
 from models.yourUNet import YourUNet
 from models.yourSegNet import YourSegNet
+from models.UNet import UNet
+from manage.CNNTrainTestManager import CNNTrainTestManager, optimizer_setup
+from manage.HDF5Dataset import HDF5Dataset
 from torchvision import datasets
-
+from utils.utils import dice_loss
 
 def argument_parser():
     """
@@ -41,7 +37,7 @@ def argument_parser():
                                      add_help=True)
     parser.add_argument('--model', type=str, default="CnnVanilla",
                         choices=["CnnVanilla", "VggNet", "AlexNet", "ResNet", "yourUNet", "yourSegNet", "UNet"])
-    parser.add_argument('--dataset', type=str, default="cifar10", choices=["cifar10", "svhn"])
+    parser.add_argument('--dataset', type=str, default="cifar10", choices=["cifar10", "svhn","acdc"])
     parser.add_argument('--loss', type=str, default="CE")
     parser.add_argument('--batch_size', type=int, default=20,
                         help='The size of the training batch')
@@ -75,9 +71,6 @@ if __name__ == "__main__":
     else:
         print('Data augmentation NOT activated!')
 
-    # set hdf5 path according your hdf5 file location
-    acdc_hdf5_file = '../data/ift780_acdc.hdf5'
-
     # Transform is used to normalize data among others
     acdc_base_transform = transforms.Compose([
         transforms.ToTensor()
@@ -92,11 +85,12 @@ if __name__ == "__main__":
         ]
     )
     base_transform = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+        transforms.ToTensor()
     ])
 
     transform = base_transform
+    # set hdf5 path 
+    acdc_path = '../data/ift780_acdc.hdf5'
     if data_augment:
         transform = transforms.Compose([data_augment_transform, transform])
 
@@ -109,7 +103,11 @@ if __name__ == "__main__":
         # Download the train and test set and apply transform on it
         train_set = datasets.SVHN(root='../data', split='train', download=True, transform=transform)
         test_set = datasets.SVHN(root='../data', split='test', download=True, transform=base_transform)
-
+   
+    elif args.dataset == 'acdc':
+        train_set = HDF5Dataset('train', acdc_path, transform=transform)
+        test_set = HDF5Dataset('test', acdc_path, transform=base_transform)
+   
     if args.optimizer == 'SGD':
         optimizer_factory = optimizer_setup(torch.optim.SGD, lr=learning_rate, momentum=0.9)
     elif args.optimizer == 'Adam':
@@ -124,20 +122,27 @@ if __name__ == "__main__":
     elif args.model == 'ResNet':
         model = ResNet(num_classes=10)
     elif args.model == 'yourSegNet':
-        model = YourSegNet(num_classes=4)  
+        print("Modèle " + args.model + " non implémenté")
+        exit(0)
     elif args.model == 'yourUNet':
-        model = YourUNet(num_classes= 4)
+        model = YourUNet(num_classes=4)
     elif args.model == 'UNet':
         model = UNet(num_classes=4)
         args.dataset = 'acdc'
-        train_set = HDF5Dataset('train', acdc_hdf5_file, transform=acdc_base_transform)
-        test_set = HDF5Dataset('test', acdc_hdf5_file, transform=acdc_base_transform)
+        train_set = HDF5Dataset('train', acdc_path, transform=acdc_base_transform)
+        test_set = HDF5Dataset('test', acdc_path, transform=acdc_base_transform)
+    if args.loss == 'CE':
+      loss_fn = nn.CrossEntropyLoss()
+    elif args.loss == 'dice':
+      loss_fn = dice_loss
 
+    else:
+          raise Exception("Loss function not found!")
     model_trainer = CNNTrainTestManager(model=model,
                                         trainset=train_set,
                                         testset=test_set,
                                         batch_size=batch_size,
-                                        loss_fn=nn.CrossEntropyLoss(),
+                                        loss_fn=loss_fn,
                                         optimizer_factory=optimizer_factory,
                                         validation=val_set,
                                         use_cuda=True)
