@@ -119,12 +119,6 @@ class YourSegNet(CNNBaseModel):
             nn.ReLU(),
             nn.BatchNorm2d(out_channels)
         )
-    @property
-    def name(self):
-        """
-        Nom du modèle
-        """
-        return "YourSegNet"
 
 '''
 Fin de votre code.
