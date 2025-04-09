@@ -10,7 +10,7 @@ Other: Suggestions are welcome
 
 import torch
 import torch.nn as nn
-from models.CNNBaseModel import CNNBaseModel
+from .CNNBaseModel import CNNBaseModel
 
 
 class UNet(CNNBaseModel):

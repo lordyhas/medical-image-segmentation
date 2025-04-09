@@ -10,7 +10,10 @@ Other: Suggestions are welcome
 
 import torch
 import torch.nn as nn
-from CNNBaseModel import CNNBaseModel
+from models.CNNBaseModel import CNNBaseModel
+from models.CNNBlocks import BottleneckBlock, DenseBlock, ResidualBlock
+import torch.nn.functional as F
+import torchvision
 
 '''
 TODO
@@ -19,6 +22,9 @@ Ajouter du code ici pour faire fonctionner le réseau YourUNet.  Un réseau insp
 mais comprenant des connexions résiduelles et denses.  Soyez originaux et surtout... amusez-vous!
 
 '''
+def center_crop(enc_feat, target_feat):
+    _, _, H, W = target_feat.size()
+    return torchvision.transforms.CenterCrop([H, W])(enc_feat)
 
 
 class YourUNet(CNNBaseModel):
@@ -35,19 +41,19 @@ class YourUNet(CNNBaseModel):
             network's weights.
         """
         super().__init__(num_classes, init_weights)
-        # encodeur
-        in_channels = 1  # image en gris
+        # encoder
+        in_channels = 1  # gray image
         self.conv_encoder1 = self._conv_block(in_channels=in_channels, out_channels=64)
         self.conv_encoder2 = self._contraction_block(64, 128)
         self.conv_encoder3 = self._contraction_block(128, 256)
         self.conv_encoder4 = self._contraction_block(256, 512)
         self.conv_encoder5 = self._contraction_block(512, 1024)
 
-        # Milieu
+        # Middle
         self.conv_mid_decoder = nn.ConvTranspose2d(in_channels=1024, out_channels=512, kernel_size=3, stride=2, padding=1, output_padding=1)
         
 
-        # Decodeur
+        # Decode
         self.conv_decoder4 = self._expansion_block(1024, 256)
         self.conv_decoder3 = self._expansion_block(512, 128)
         self.conv_decoder2 = self._expansion_block(256, 64)
@@ -59,28 +65,30 @@ class YourUNet(CNNBaseModel):
         Args:
             x: Tensor
         """
-        # Encodeur
+        # Encode
         encode_block1 = self.conv_encoder1(x)
         encode_block2 = self.conv_encoder2(encode_block1)
         encode_block3 = self.conv_encoder3(encode_block2)
         encode_block4 = self.conv_encoder4(encode_block3)
         encode_block5 = self.conv_encoder5(encode_block4)
 
-        # Milieu 
+        # middle
         decode_middle = self.conv_mid_decoder(encode_block5)
         
-        # Decodeur
+        # Decode
         decode_block4 = torch.cat((decode_middle, encode_block4), 1)
         cat_layer3 = self.conv_decoder4(decode_block4)
-
-        decode_block3 = torch.cat((cat_layer3, encode_block3), 1)
+        
+        encode_block3 = center_crop(encode_block3, cat_layer3)
+        decode_block3 = torch.cat((cat_layer3, encode_block3), dim=1)
         cat_layer2 = self.conv_decoder3(decode_block3)
-
+        encode_block2 = center_crop(encode_block2, cat_layer2)
         decode_block2 = torch.cat((cat_layer2, encode_block2), 1)
         cat_layer1 = self.conv_decoder2(decode_block2)
-
+        encode_block1 = center_crop(encode_block1, cat_layer1)
         decode_block1 = torch.cat((cat_layer1, encode_block1), 1)
         final_layer = self.final_layer(decode_block1)
+        final_layer = F.interpolate(final_layer, size=(256, 256), mode='bilinear', align_corners=False)
         return final_layer
 
     @staticmethod
