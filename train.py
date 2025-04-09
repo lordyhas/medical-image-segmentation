@@ -195,8 +195,18 @@ if __name__ == "__main__":
                                         checkpoint_dir=checkpoint_dir)
 
     if args.predict is not None:
-        model.load_weights(args.predict)
-        print("predicting the mask of a randomly selected image from test set")
+        # Chargement du checkpoint
+        print(f"Chargement du checkpoint: {args.predict}")
+        checkpoint = torch.load(args.predict, map_location=torch.device('cuda' if use_cuda else 'cpu'))
+
+        # Vérifier si le checkpoint contient model_state_dict (nouveau format) ou directement les poids (ancien format)
+        if 'model_state_dict' in checkpoint:
+            model.load_state_dict(checkpoint['model_state_dict'])
+            print(f"Précision de validation du modèle chargé: {checkpoint.get('val_acc', 'N/A')}")
+        else:
+            model.load_state_dict(checkpoint)
+
+        print("Prédiction de masques pour des images aléatoires du jeu de test")
         model_trainer.plot_image_mask_prediction()
     else:
         # Afficher des informations sur l'utilisation du GPU
@@ -206,7 +216,6 @@ if __name__ == "__main__":
         else:
             print(
                 f"Entraînement de {model.__class__.__name__} sur {args.dataset} pour {args.num_epochs} époques utilisant CPU")
-
         model_trainer.train(num_epochs)
         model_trainer.evaluate_on_test_set()
         if isinstance(model, UNet):
