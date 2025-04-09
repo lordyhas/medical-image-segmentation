@@ -10,6 +10,7 @@ Other: Suggestions are welcome
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from src.models.CNNBaseModel import CNNBaseModel
 
 '''
@@ -20,7 +21,6 @@ Soyez originaux et surtout... amusez-vous!
 
 '''
 
-# source: https://github.com/VainF/DeepLabV3Plus-Pytorch/blob/master/network/_deeplab.py
 
 class YourSegNet(CNNBaseModel):
     """
@@ -67,11 +67,14 @@ class YourSegNet(CNNBaseModel):
 
         # Decoder avec skip connections asymétriques
         d4 = self.decoder4(e5)
-        d3 = self.decoder3(d4 + e3)
-        d2 = self.decoder2(d3 + e2)
-        d1 = self.decoder1(d2 + e1)
+        d3 = self.decoder3(d4) + e3  # Skip connection asymétrique
+        d2 = self.decoder2(d3) + e2  # Skip connection asymétrique
+        d1 = self.decoder1(d2) + e1  # Skip connection asymétrique
 
-        return self.final(d1)
+        # Upsample final pour obtenir la taille d'origine
+        output = self.final(d1)
+        output = F.interpolate(output, size=x.shape[2:], mode='bilinear', align_corners=False)
+        return output
 
     @staticmethod
     def _encoder_block(in_channels, out_channels):
@@ -116,6 +119,7 @@ class YourSegNet(CNNBaseModel):
             nn.ReLU(),
             nn.BatchNorm2d(out_channels)
         )
+
 
 '''
 Fin de votre code.
