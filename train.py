@@ -17,11 +17,10 @@ import torchvision.transforms as transforms
 from torchvision import datasets
 import numpy as np
 
-from src.models.CNNVanilla import CnnVanilla
 # Importation des modèles et des outils
 # from src.utils.preprocess import get_data_loader, get_data_loader_svhn
-#from src.utils.utils import optimizer_setup, create_figure
-
+# from src.utils.utils import optimizer_setup, create_figure
+from src.models.CNNVanilla import CnnVanilla
 from src.models.AlexNet import AlexNet
 from src.models.VggNet import VggNet
 from src.models.ResNet import ResNet
@@ -80,6 +79,8 @@ def argument_parser():
     parser.add_argument('--predict', type=str,
                         help="Name of the file containing model weights used to make "
                              "segmentation prediction on test data")
+    parser.add_argument('--max_samples', type=int, default=None,
+                        help="Maximum number of training samples to use (for quick testing)")
     return parser.parse_args()
 
 
@@ -158,11 +159,17 @@ if __name__ == "__main__":
         args.dataset = 'acdc'
         train_set = HDF5Dataset('train', acdc_hdf5_file, transform=acdc_base_transform)
         test_set = HDF5Dataset('test', acdc_hdf5_file, transform=acdc_base_transform)
+        if args.max_samples is not None:
+            print(f"Utilisation de {args.max_samples} échantillons pour l'entraînement")
+            train_set = torch.utils.data.Subset(train_set, range(min(args.max_samples, len(train_set))))
     elif args.model == 'YourSegNet':
         model = YourSegNet(num_classes=4)
         args.dataset = 'acdc'
         train_set = HDF5Dataset('train', acdc_hdf5_file, transform=acdc_base_transform)
         test_set = HDF5Dataset('test', acdc_hdf5_file, transform=acdc_base_transform)
+        if args.max_samples is not None:
+            print(f"Utilisation de {args.max_samples} échantillons pour l'entraînement")
+            train_set = torch.utils.data.Subset(train_set, range(min(args.max_samples, len(train_set))))
     elif args.model == 'UNet':
         model = UNet(num_classes=4)
         args.dataset = 'acdc'
