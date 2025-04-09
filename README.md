@@ -93,4 +93,4 @@ La perte Focal est conçue pour gérer le déséquilibre des classes :
 ## Courbes d'entraînement
 [À remplir apres l'entraînement des model]
 
-![fig1.png](src%2Ffig1.png)
+![fig1.png](figures/YourSegNet_metrics-dice-e10.png)
