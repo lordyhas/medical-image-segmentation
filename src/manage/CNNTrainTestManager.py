@@ -101,12 +101,14 @@ class CNNTrainTestManager(object):
             'device': str(self.device)
         }
 
+        model_name = self.model.__class__.__name__
+
         # Sauvegarde du checkpoint de l'époque
-        torch.save(checkpoint, os.path.join(self.checkpoint_dir, f'checkpoint_epoch_{epoch}.pth'))
+        torch.save(checkpoint, os.path.join(self.checkpoint_dir, f'checkpoint_epoch_{epoch}_{model_name}.pth'))
 
         # Si c'est le meilleur modèle, on le sauvegarde séparément
         if is_best:
-            torch.save(checkpoint, os.path.join(self.checkpoint_dir, 'best_model.pth'))
+            torch.save(checkpoint, os.path.join(self.checkpoint_dir, f'best_model_{model_name}.pth'))
             print(
                 f'Nouveau meilleur modèle sauvegardé avec une précision de validation de {self.metric_values["val_acc"][-1]:.3f}')
 
@@ -308,7 +310,7 @@ class CNNTrainTestManager(object):
         # f.savefig('fig1.png')
 
         # Save figure with model-specific name
-        model_name = os.path.basename(self.checkpoint_dir)
+        model_name = self.model.__class__.__name__  # os.path.basename(self.checkpoint_dir)
         figures_dir = 'figures'
         os.makedirs(figures_dir, exist_ok=True)
         fig_path = os.path.join(figures_dir, f'{model_name}_metrics.png')
@@ -382,7 +384,7 @@ class CNNTrainTestManager(object):
             # f.savefig('fig{}.png'.format(it+1))
 
             # Save as a png image with model-specific name
-            model_name = os.path.basename(self.checkpoint_dir)
+            model_name = self.model.__class__.__name__  # os.path.basename(self.checkpoint_dir)
             figures_dir = 'figures'
             os.makedirs(figures_dir, exist_ok=True)
             fig_path = os.path.join(figures_dir, f'{model_name}_prediction_{it}.png')
