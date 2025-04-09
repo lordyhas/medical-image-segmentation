@@ -91,6 +91,7 @@ def display_time(elapsed_time):
     """
     Affiche le temps écoulé au format approprié (secondes, minutes ou heures).
     """
+    print("")
     if elapsed_time < 60:
         print(f"Temps d'entraînement total: {elapsed_time:.2f} secondes")
     elif elapsed_time < 3600:
@@ -234,6 +235,21 @@ if __name__ == "__main__":
         start_time = time.time()
 
         model_trainer.train(num_epochs)
+
+        # Afficher les métriques finales
+        final_train_acc = model_trainer.metric_values['train_acc'][-1]
+        final_val_acc = model_trainer.metric_values['val_acc'][-1]
+        final_train_loss = model_trainer.metric_values['train_loss'][-1]
+        final_val_loss = model_trainer.metric_values['val_loss'][-1]
+
+        print("\n" + "=" * 20 + " RÉSULTATS FINAUX " + "=" * 20)
+        print(f"Accuracy d'entraînement finale: {(100 * final_train_acc):.4f}")
+        print(f"Accuracy de validation finale: {(100 * final_val_acc):.4f}")
+        print(f"Loss d'entraînement finale: {final_train_loss:.4f}")
+        print(f"Loss de validation finale: {final_val_loss:.4f}")
+        print("=" * 60 + "\n")
+
+
         model_trainer.evaluate_on_test_set()
 
         display_time(time.time() - start_time)
