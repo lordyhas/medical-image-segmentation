@@ -110,6 +110,7 @@ if __name__ == "__main__":
     val_set = args.validation
     learning_rate = args.lr
     data_augment = args.data_aug
+    data_aug_medical = args.data_aug_medical
     if data_augment:
         print('Data augmentation activated!')
     else:
@@ -122,6 +123,18 @@ if __name__ == "__main__":
     acdc_base_transform = transforms.Compose([
         transforms.ToTensor()
     ])
+
+    # Augmentation pour les images médicales
+    medical_transform = []
+    if data_aug_medical:
+        medical_transform = [
+            # Rotation aléatoire légère (-15 à +15 degrés)
+            transforms.RandomRotation(15, fill=0),
+            # Variation d'intensité aléatoire
+            transforms.ColorJitter(brightness=0.15, contrast=0.15),
+            # Flips horizontaux aléatoires
+            transforms.RandomHorizontalFlip(),
+        ]
 
     data_augment_transform = transforms.Compose(
         [
