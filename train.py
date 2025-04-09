@@ -10,8 +10,6 @@ Other: Suggestions are welcome
 """
 
 import argparse
-import time
-
 import torch
 import torch.optim as optim
 import torch.nn as nn
@@ -19,6 +17,9 @@ import torchvision.transforms as transforms
 from torchvision import datasets
 import numpy as np
 import os
+import scipy.ndimage
+import h5py
+import matplotlib.pyplot as plt
 
 # Importation des modèles et des outils
 # from src.utils.preprocess import get_data_loader, get_data_loader_svhn
@@ -34,6 +35,8 @@ from src.manage.HDF5Dataset import HDF5Dataset
 from src.manage.DataManager import DataManager
 from src.manage.CNNTrainTestManager import CNNTrainTestManager, optimizer_setup
 from src.utils.losses import FocalLoss, DiceLoss
+from src.utils.utils import convert_mask_to_rgb_image
+from src.utils.elastic_transform import ElasticTransform
 
 # Vérification et affichage des informations sur le GPU
 print("=" * 50)
@@ -84,6 +87,12 @@ def argument_parser():
                              "segmentation prediction on test data")
     parser.add_argument('--max_samples', type=int, default=None,
                         help="Maximum number of training samples to use (for quick testing)")
+    parser.add_argument('--data_aug_medical', action='store_true',
+                        help="Apply medical image data augmentation (rotations, intensity variations)")
+    parser.add_argument('--data_aug_elastic', action='store_true',
+                        help="Apply elastic deformations data augmentation")
+    parser.add_argument('--visualize_augmentation', action='store_true',
+                        help="Visualize the effects of data augmentation on a few samples")
     return parser.parse_args()
 
 
@@ -101,6 +110,7 @@ def display_time(elapsed_time):
         elapsed_time /= 3600
         print(f"Temps d'entraînement total: {elapsed_time:.2f} heures")
 
+
 if __name__ == "__main__":
 
     args = argument_parser()
@@ -111,10 +121,14 @@ if __name__ == "__main__":
     learning_rate = args.lr
     data_augment = args.data_aug
     data_aug_medical = args.data_aug_medical
+    data_aug_elastic = args.data_aug_elastic
+
     if data_augment:
         print('Data augmentation activated!')
-    else:
-        print('Data augmentation NOT activated!')
+    if data_aug_medical:
+        print('Medical image augmentation activated!')
+    if data_aug_elastic:
+        print('Elastic deformation augmentation activated!')
 
     # set hdf5 path according your hdf5 file location
     acdc_hdf5_file = 'data/ift780_acdc.hdf5'
@@ -136,14 +150,22 @@ if __name__ == "__main__":
             transforms.RandomHorizontalFlip(),
         ]
 
-    data_augment_transform = transforms.Compose(
-        [
-            transforms.RandomCrop(32),
-            transforms.RandomHorizontalFlip(),
-            transforms.RandomAffine(10),
-            transforms.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1),
-        ]
-    )
+    elastic_transform = []
+    if data_aug_elastic:
+        try:
+            elastic_transform = [ElasticTransform()]
+            print("Elastic transform successfully initialized")
+        except ImportError:
+            print("Warning: scipy not found, elastic transform disabled")
+            data_aug_elastic = False
+
+    # Construire les transformations pour les images médicales
+    acdc_transform = acdc_base_transform
+    if data_aug_medical or data_aug_elastic:
+        all_transforms = medical_transform + elastic_transform + [transforms.ToTensor()]
+        acdc_transform = transforms.Compose(all_transforms)
+        print("Medical data augmentation pipeline created")
+
     base_transform = transforms.Compose([
         transforms.ToTensor(),
         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
@@ -151,7 +173,7 @@ if __name__ == "__main__":
 
     transform = base_transform
     if data_augment:
-        transform = transforms.Compose([data_augment_transform, transform])
+        transform = transforms.Compose([acdc_transform, transform])
     data_path = 'data'
     if args.dataset == 'cifar10':
         # Download the train and test set and apply transform on it
@@ -187,7 +209,9 @@ if __name__ == "__main__":
     elif args.model == 'YourUNet':
         model = YourUNet(num_classes=4)
         args.dataset = 'acdc'
-        train_set = HDF5Dataset('train', acdc_hdf5_file, transform=acdc_base_transform)
+        # Utiliser la transformation avec augmentation si activée
+        transform_to_use = acdc_transform if (data_aug_medical or data_aug_elastic) else acdc_base_transform
+        train_set = HDF5Dataset('train', acdc_hdf5_file, transform=transform_to_use)
         test_set = HDF5Dataset('test', acdc_hdf5_file, transform=acdc_base_transform)
         if args.max_samples is not None:
             print(f"Utilisation de {args.max_samples} échantillons pour l'entraînement")
@@ -195,7 +219,9 @@ if __name__ == "__main__":
     elif args.model == 'YourSegNet':
         model = YourSegNet(num_classes=4)
         args.dataset = 'acdc'
-        train_set = HDF5Dataset('train', acdc_hdf5_file, transform=acdc_base_transform)
+        # Utiliser la transformation avec augmentation si activée
+        transform_to_use = acdc_transform if (data_aug_medical or data_aug_elastic) else acdc_base_transform
+        train_set = HDF5Dataset('train', acdc_hdf5_file, transform=transform_to_use)
         test_set = HDF5Dataset('test', acdc_hdf5_file, transform=acdc_base_transform)
         if args.max_samples is not None:
             print(f"Utilisation de {args.max_samples} échantillons pour l'entraînement")
@@ -203,7 +229,9 @@ if __name__ == "__main__":
     elif args.model == 'UNet':
         model = UNet(num_classes=4)
         args.dataset = 'acdc'
-        train_set = HDF5Dataset('train', acdc_hdf5_file, transform=acdc_base_transform)
+        # Utiliser la transformation avec augmentation si activée
+        transform_to_use = acdc_transform if (data_aug_medical or data_aug_elastic) else acdc_base_transform
+        train_set = HDF5Dataset('train', acdc_hdf5_file, transform=transform_to_use)
         test_set = HDF5Dataset('test', acdc_hdf5_file, transform=acdc_base_transform)
 
     # Créer un répertoire de checkpoint spécifique au modèle
@@ -212,6 +240,8 @@ if __name__ == "__main__":
         checkpoint_dir += f'_samples{args.max_samples}'
     os.makedirs(checkpoint_dir, exist_ok=True)
     print(f"Les checkpoints seront sauvegardés dans: {checkpoint_dir}")
+
+
 
     model_trainer = CNNTrainTestManager(model=model,
                                         trainset=train_set,
@@ -245,8 +275,6 @@ if __name__ == "__main__":
         else:
             print(
                 f"Entraînement de {model.__class__.__name__} sur {args.dataset} pour {args.num_epochs} époques utilisant CPU")
-        start_time = time.time()
-
         model_trainer.train(num_epochs)
 
         # Afficher les métriques finales
@@ -255,22 +283,15 @@ if __name__ == "__main__":
         final_train_loss = model_trainer.metric_values['train_loss'][-1]
         final_val_loss = model_trainer.metric_values['val_loss'][-1]
 
-        print("\n" + "=" * 20 + " RÉSULTATS FINAUX " + "=" * 20)
-        print(f"Accuracy d'entraînement finale: {(100 * final_train_acc):.4f}")
-        print(f"Accuracy de validation finale: {(100 * final_val_acc):.4f}")
+        print("\n" + "=" * 30 + " RÉSULTATS FINAUX " + "=" * 30)
+        print(f"Accuracy d'entraînement finale: {final_train_acc:.4f}")
+        print(f"Accuracy de validation finale: {final_val_acc:.4f}")
         print(f"Loss d'entraînement finale: {final_train_loss:.4f}")
         print(f"Loss de validation finale: {final_val_loss:.4f}")
-        print("=" * 60 + "\n")
-
+        print("=" * 77 + "\n")
 
         model_trainer.evaluate_on_test_set()
-
-        display_time(time.time() - start_time)
-
         if isinstance(model, UNet):
             model.save()  # save the model's weights for prediction (see help for more details)
             model_trainer.plot_image_mask_prediction()
         model_trainer.plot_metrics()
-
-
-
