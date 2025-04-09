@@ -10,6 +10,8 @@ Other: Suggestions are welcome
 """
 
 import argparse
+import time
+
 import torch
 import torch.optim as optim
 import torch.nn as nn
@@ -84,6 +86,19 @@ def argument_parser():
                         help="Maximum number of training samples to use (for quick testing)")
     return parser.parse_args()
 
+
+def display_time(elapsed_time):
+    """
+    Affiche le temps écoulé au format approprié (secondes, minutes ou heures).
+    """
+    if elapsed_time < 60:
+        print(f"Temps d'entraînement total: {elapsed_time:.2f} secondes")
+    elif elapsed_time < 3600:
+        elapsed_time /= 60
+        print(f"Temps d'entraînement total: {elapsed_time:.2f} minutes")
+    else:
+        elapsed_time /= 3600
+        print(f"Temps d'entraînement total: {elapsed_time:.2f} heures")
 
 if __name__ == "__main__":
 
@@ -216,9 +231,17 @@ if __name__ == "__main__":
         else:
             print(
                 f"Entraînement de {model.__class__.__name__} sur {args.dataset} pour {args.num_epochs} époques utilisant CPU")
+        start_time = time.time()
+
         model_trainer.train(num_epochs)
         model_trainer.evaluate_on_test_set()
+
+        display_time(time.time() - start_time)
+
         if isinstance(model, UNet):
             model.save()  # save the model's weights for prediction (see help for more details)
             model_trainer.plot_image_mask_prediction()
         model_trainer.plot_metrics()
+
+
+
