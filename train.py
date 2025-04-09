@@ -241,7 +241,139 @@ if __name__ == "__main__":
     os.makedirs(checkpoint_dir, exist_ok=True)
     print(f"Les checkpoints seront sauvegardés dans: {checkpoint_dir}")
 
+    # Visualiser l'augmentation de données si demandé
+    if args.visualize_augmentation and args.dataset == 'acdc':
+        # Créer un dossier pour sauvegarder les visualisations
+        aug_viz_dir = 'augmentation_examples'
+        os.makedirs(aug_viz_dir, exist_ok=True)
 
+        print(f"Génération d'exemples d'augmentation de données dans {aug_viz_dir}...")
+
+        with h5py.File(acdc_hdf5_file, 'r') as f:
+            # Prendre quelques exemples aléatoires
+            set_list = list(f['train'].keys())
+            for idx in range(3):  # Générer 3 exemples
+                # Sélectionner un patient et une coupe aléatoire
+                patient_key = np.random.choice(set_list)
+                patient = f['train'][patient_key]
+                img = np.array(patient['img'])
+                gt = np.array(patient['gt'])
+                slice_idx = np.random.randint(0, img.shape[0])
+
+                # Image et masque originaux
+                orig_img = img[slice_idx]
+                orig_gt = gt[slice_idx]
+                orig_gt_rgb = convert_mask_to_rgb_image(np.argmax(orig_gt, axis=-1))
+
+                # Appliquer les transformations médicales
+                if data_aug_medical:
+                    # Convertir en tenseur pour les transformations
+                    img_tensor = torch.from_numpy(orig_img).unsqueeze(0).float()  # Ajouter dim canal
+                    gt_tensor = torch.from_numpy(orig_gt).permute(2, 0, 1).float()  # HWC -> CHW
+
+                    # Appliquer les mêmes transformations avec la même seed
+                    seed = np.random.randint(0, 1000000)
+                    torch.manual_seed(seed)
+                    transformed_img = transforms.RandomRotation(15, fill=0)(img_tensor)
+                    transformed_img = transforms.ColorJitter(brightness=0.15, contrast=0.15)(transformed_img)
+                    torch.manual_seed(seed)
+                    transformed_gt = transforms.RandomRotation(15, fill=0)(gt_tensor)
+
+                    # Flip séparément pour la visualisation
+                    torch.manual_seed(seed + 1)  # Nouvelle seed pour avoir un exemple différent
+                    flipped_img = transforms.RandomHorizontalFlip(p=1.0)(img_tensor)
+                    torch.manual_seed(seed + 1)
+                    flipped_gt = transforms.RandomHorizontalFlip(p=1.0)(gt_tensor)
+
+                    # Convertir en numpy pour l'affichage
+                    transformed_img_np = transformed_img.squeeze(0).numpy()
+                    transformed_gt_np = transformed_gt.argmax(dim=0).numpy()
+                    transformed_gt_rgb = convert_mask_to_rgb_image(transformed_gt_np)
+
+                    flipped_img_np = flipped_img.squeeze(0).numpy()
+                    flipped_gt_np = flipped_gt.argmax(dim=0).numpy()
+                    flipped_gt_rgb = convert_mask_to_rgb_image(flipped_gt_np)
+
+                    # Créer la figure
+                    fig, axs = plt.subplots(3, 2, figsize=(10, 12))
+
+                    # Originaux
+                    axs[0, 0].imshow(orig_img, cmap='gray')
+                    axs[0, 0].set_title('Image originale')
+                    axs[0, 0].axis('off')
+                    axs[0, 1].imshow(orig_gt_rgb)
+                    axs[0, 1].set_title('Masque original')
+                    axs[0, 1].axis('off')
+
+                    # Transformations (rotation + contraste)
+                    axs[1, 0].imshow(transformed_img_np, cmap='gray')
+                    axs[1, 0].set_title('Rotation + Intensité')
+                    axs[1, 0].axis('off')
+                    axs[1, 1].imshow(transformed_gt_rgb)
+                    axs[1, 1].set_title('Masque transformé')
+                    axs[1, 1].axis('off')
+
+                    # Flip horizontal
+                    axs[2, 0].imshow(flipped_img_np, cmap='gray')
+                    axs[2, 0].set_title('Flip horizontal')
+                    axs[2, 0].axis('off')
+                    axs[2, 1].imshow(flipped_gt_rgb)
+                    axs[2, 1].set_title('Masque flippé')
+                    axs[2, 1].axis('off')
+
+                    plt.tight_layout()
+                    plt.savefig(os.path.join(aug_viz_dir, f'medical_augmentation_example_{idx + 1}.png'))
+                    plt.close()
+
+                # Appliquer les transformations élastiques
+                if data_aug_elastic:
+                    elastic_transform_instance = ElasticTransform()
+
+                    # Préparer les images pour la transformation
+                    img_tensor = torch.from_numpy(orig_img).unsqueeze(0).float()
+                    gt_channel_tensor = torch.from_numpy(np.argmax(orig_gt, axis=-1)).unsqueeze(0).float()
+
+                    # Appliquer la transformation avec la même seed
+                    seed = np.random.randint(0, 1000000)
+                    np.random.seed(seed)
+                    elastic_img = elastic_transform_instance(img_tensor)
+                    np.random.seed(seed)
+                    elastic_gt = elastic_transform_instance(gt_channel_tensor)
+
+                    # Convertir pour l'affichage
+                    elastic_img_np = elastic_img.squeeze(0).numpy()
+                    elastic_gt_np = elastic_gt.squeeze(0).numpy().astype(int)
+                    elastic_gt_rgb = convert_mask_to_rgb_image(elastic_gt_np)
+
+                    # Créer la figure
+                    fig, axs = plt.subplots(2, 2, figsize=(10, 8))
+
+                    # Originaux
+                    axs[0, 0].imshow(orig_img, cmap='gray')
+                    axs[0, 0].set_title('Image originale')
+                    axs[0, 0].axis('off')
+                    axs[0, 1].imshow(orig_gt_rgb)
+                    axs[0, 1].set_title('Masque original')
+                    axs[0, 1].axis('off')
+
+                    # Déformation élastique
+                    axs[1, 0].imshow(elastic_img_np, cmap='gray')
+                    axs[1, 0].set_title('Déformation élastique')
+                    axs[1, 0].axis('off')
+                    axs[1, 1].imshow(elastic_gt_rgb)
+                    axs[1, 1].set_title('Masque déformé')
+                    axs[1, 1].axis('off')
+
+                    plt.tight_layout()
+                    plt.savefig(os.path.join(aug_viz_dir, f'elastic_augmentation_example_{idx + 1}.png'))
+                    plt.close()
+
+        print(f"Visualisations d'augmentation de données générées dans {aug_viz_dir}")
+        if args.predict is None:
+            # Si nous ne sommes pas en mode prediction, nous pouvons terminer ici
+            print(
+                "Exécuter avec --data_aug_medical et/ou --data_aug_elastic pour appliquer ces augmentations à l'entraînement")
+            exit(0)
 
     model_trainer = CNNTrainTestManager(model=model,
                                         trainset=train_set,
