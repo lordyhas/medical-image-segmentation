@@ -12,8 +12,8 @@ import torch
 import torch.nn as nn
 from models.CNNBaseModel import CNNBaseModel
 from models.CNNBlocks import BottleneckBlock, DenseBlock, ResidualBlock
-import torch.nn.functional as F
 import torchvision
+import torch.nn.functional as F
 
 '''
 TODO
