@@ -305,7 +305,16 @@ class CNNTrainTestManager(object):
         ax2.set_xlabel('Epochs')
         ax2.set_ylabel('accuracy')
         ax2.legend()
-        f.savefig('fig1.png')
+        # f.savefig('fig1.png')
+
+        # Save figure with model-specific name
+        model_name = os.path.basename(self.checkpoint_dir)
+        figures_dir = 'figures'
+        os.makedirs(figures_dir, exist_ok=True)
+        fig_path = os.path.join(figures_dir, f'{model_name}_metrics.png')
+        f.savefig(fig_path)
+        print(f'Métriques sauvegardées dans: {fig_path}')
+
         plt.show()
 
     def plot_image_mask_prediction(self):
@@ -369,9 +378,17 @@ class CNNTrainTestManager(object):
             ax4.imshow(prediction.astype('uint8'))
             ax4.set_title('predicted segmentation')
             ax4.axis('off')
+            # # Save as a png image
+            # f.savefig('fig{}.png'.format(it+1))
 
-            # Save as a png image
-            f.savefig('fig{}.png'.format(it + 1))
+            # Save as a png image with model-specific name
+            model_name = os.path.basename(self.checkpoint_dir)
+            figures_dir = 'figures'
+            os.makedirs(figures_dir, exist_ok=True)
+            fig_path = os.path.join(figures_dir, f'{model_name}_prediction_{it}.png')
+            f.savefig(fig_path)
+            print(f'Prédiction sauvegardée dans: {fig_path}')
+
             # show image
             plt.show()
 
