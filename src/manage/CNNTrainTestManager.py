@@ -394,6 +394,171 @@ class CNNTrainTestManager(object):
             # show image
             plt.show()
 
+    def visualize_data_augmentation(self, num_samples=3):
+        """
+        Visualise les effets de l'augmentation de données sur quelques images et leurs masques
+        Args:
+            num_samples: nombre d'échantillons à visualiser
+        """
+        import matplotlib.pyplot as plt
+        import random
+        import torch
+        import numpy as np
+        from src.utils.utils import convert_mask_to_rgb_image
+        from src.utils.data_augmentation import ACDCJointTransform
+
+        # Obtenir le jeu de données d'entraînement
+        train_loader = self.data_manager.get_train_set()
+
+        # Vérifier si l'ensemble d'entraînement est vide
+        if len(train_loader) == 0:
+            print("ATTENTION: L'ensemble d'entraînement est vide! Impossible de visualiser l'augmentation de données.")
+            return
+
+        # Obtenir le nombre réel d'échantillons disponibles
+        num_available_samples = min(len(train_loader), num_samples)
+        if num_available_samples < num_samples:
+            print(
+                f"ATTENTION: Seulement {num_available_samples} échantillons disponibles au lieu de {num_samples} demandés.")
+
+        # Créer les transformations d'augmentation pour la démonstration
+        # Utiliser les nouvelles transformations
+        rotation_transform = ACDCJointTransform(rotation=True, elastic=False, rotation_degrees=60)
+        elastic_transform = ACDCJointTransform(rotation=False, elastic=True, elastic_alpha=50.0, elastic_sigma=5.0)
+
+        # Obtenir quelques échantillons du jeu de données
+        samples = []
+        for i, data in enumerate(train_loader):
+            if i >= num_available_samples:
+                break
+            samples.append(data)
+
+        # Pour chaque échantillon, appliquer les transformations et afficher les résultats
+        for i, (inputs, labels) in enumerate(samples):
+            try:
+                # Déplacer les tenseurs vers le CPU pour traitement
+                input_img = inputs[0].cpu().numpy()
+                label_img = labels[0].cpu().numpy()
+
+                # Debug - afficher les dimensions
+                print(f"input_img shape: {input_img.shape}")
+                print(f"label_img shape: {label_img.shape}")
+
+                # Supprimer la dimension de canal pour l'image d'entrée si présente
+                if len(input_img.shape) == 3 and input_img.shape[0] == 1:
+                    input_img = input_img.squeeze(0)
+
+                # Sauvegarder la graine pour assurer la même transformation sur l'image et le masque
+                seed = 42 + i
+                random.seed(seed)
+                np.random.seed(seed)
+                torch.manual_seed(seed)
+
+                # Créer un masque one-hot pour la visualisation
+                if len(label_img.shape) == 2:  # Si le masque est déjà en format catégorique
+                    max_class = int(np.max(label_img)) + 1
+                    label_one_hot = np.zeros((input_img.shape[0], input_img.shape[1], max_class))
+                    for c in range(max_class):  # Pour chaque classe
+                        label_one_hot[:, :, c] = (label_img == c).astype(np.float32)
+                else:
+                    max_class = 4  # Par défaut pour ACDC
+                    label_one_hot = np.zeros((input_img.shape[0], input_img.shape[1], max_class))
+                    for c in range(max_class):  # Pour chaque classe
+                        label_one_hot[:, :, c] = (label_img == c).astype(np.float32)
+
+                # Transformer l'image d'entrée et les étiquettes avec rotation
+                random.seed(seed)
+                np.random.seed(seed)
+                torch.manual_seed(seed)
+                rotated_input = rotation_transform(input_img).numpy() if isinstance(rotation_transform(input_img),
+                                                                                    torch.Tensor) else rotation_transform(
+                    input_img)
+
+                # Pour la rotation du masque
+                rotated_label = np.zeros_like(label_img)
+                for c in range(max_class):
+                    mask = (label_img == c).astype(np.float32)
+                    random.seed(seed)
+                    np.random.seed(seed)
+                    torch.manual_seed(seed)
+                    rotated_mask = rotation_transform(mask).numpy() if isinstance(rotation_transform(mask),
+                                                                                  torch.Tensor) else rotation_transform(
+                        mask)
+                    rotated_label[rotated_mask > 0.5] = c
+
+                # Appliquer la déformation élastique
+                seed = 73 + i
+                random.seed(seed)
+                np.random.seed(seed)
+                torch.manual_seed(seed)
+                elastic_input = elastic_transform(input_img).numpy() if isinstance(elastic_transform(input_img),
+                                                                                   torch.Tensor) else elastic_transform(
+                    input_img)
+
+                elastic_label = np.zeros_like(label_img)
+                for c in range(max_class):
+                    mask = (label_img == c).astype(np.float32)
+                    random.seed(seed)
+                    np.random.seed(seed)
+                    torch.manual_seed(seed)
+                    elastic_mask = elastic_transform(mask).numpy() if isinstance(elastic_transform(mask),
+                                                                                 torch.Tensor) else elastic_transform(
+                        mask)
+                    elastic_label[elastic_mask > 0.5] = c
+
+                # Convertir les masques en images RGB pour l'affichage
+                original_label_rgb = convert_mask_to_rgb_image(label_img)
+                rotated_label_rgb = convert_mask_to_rgb_image(rotated_label)
+                elastic_label_rgb = convert_mask_to_rgb_image(elastic_label)
+
+                # Créer la figure pour afficher les résultats
+                fig, axs = plt.subplots(2, 3, figsize=(15, 10))
+
+                # Afficher les images originales et transformées
+                axs[0, 0].imshow(input_img, cmap='gray')
+                axs[0, 0].set_title('Image originale')
+                axs[0, 0].axis('off')
+
+                axs[0, 1].imshow(rotated_input, cmap='gray')
+                axs[0, 1].set_title('Image avec rotation')
+                axs[0, 1].axis('off')
+
+                axs[0, 2].imshow(elastic_input, cmap='gray')
+                axs[0, 2].set_title('Image avec déformation élastique')
+                axs[0, 2].axis('off')
+
+                # Afficher les masques originaux et transformés
+                axs[1, 0].imshow(original_label_rgb)
+                axs[1, 0].set_title('Masque original')
+                axs[1, 0].axis('off')
+
+                axs[1, 1].imshow(rotated_label_rgb)
+                axs[1, 1].set_title('Masque avec rotation')
+                axs[1, 1].axis('off')
+
+                axs[1, 2].imshow(elastic_label_rgb)
+                axs[1, 2].set_title('Masque avec déformation élastique')
+                axs[1, 2].axis('off')
+
+                plt.tight_layout()
+
+                # Créer le répertoire pour sauvegarder les figures s'il n'existe pas
+                figures_dir = 'figures'
+                os.makedirs(figures_dir, exist_ok=True)
+
+                # Sauvegarder la figure
+                fig_path = os.path.join(figures_dir, f'augmentation_example_{i + 1}.png')
+                plt.savefig(fig_path)
+                print(f"Image d'exemple d'augmentation sauvegardée sous {fig_path}")
+
+                plt.close(fig)
+
+            except Exception as e:
+                print(f"Erreur lors de la visualisation de l'échantillon {i}: {str(e)}")
+                continue
+
+        print(f"Visualisation de l'augmentation de données terminée.")
+        print(f"Les images d'exemple ont été sauvegardées dans le répertoire 'figures/'.")
 
 def optimizer_setup(optimizer_class: Type[torch.optim.Optimizer], **hyperparameters) -> \
         Callable[[torch.nn.Module], torch.optim.Optimizer]:
