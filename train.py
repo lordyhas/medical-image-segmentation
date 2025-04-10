@@ -10,8 +10,6 @@ Other: Suggestions are welcome
 """
 
 import argparse
-import time
-
 import torch
 import torch.optim as optim
 import torch.nn as nn
@@ -19,7 +17,7 @@ import torchvision.transforms as transforms
 from torchvision import datasets
 import numpy as np
 import os
-
+import time
 # Importation des modèles et des outils
 # from src.utils.preprocess import get_data_loader, get_data_loader_svhn
 # from src.utils.utils import optimizer_setup, create_figure
@@ -34,6 +32,7 @@ from src.manage.HDF5Dataset import HDF5Dataset
 from src.manage.DataManager import DataManager
 from src.manage.CNNTrainTestManager import CNNTrainTestManager, optimizer_setup
 from src.utils.losses import FocalLoss, DiceLoss
+from src.utils.data_augmentation import ACDCJointTransform
 
 # Vérification et affichage des informations sur le GPU
 print("=" * 50)
@@ -78,12 +77,18 @@ def argument_parser():
     parser.add_argument('--lr', type=float, default=0.001,
                         help='Learning rate')
     parser.add_argument('--data_aug', action='store_true',
-                        help="Data augmentation")
+                        help="Activate basic data augmentation")
+    parser.add_argument('--rotation', action='store_true',
+                        help="Activate random rotation for data augmentation")
+    parser.add_argument('--elastic', action='store_true',
+                        help="Activate elastic deformation for data augmentation")
     parser.add_argument('--predict', type=str,
                         help="Name of the file containing model weights used to make "
                              "segmentation prediction on test data")
     parser.add_argument('--max_samples', type=int, default=None,
                         help="Maximum number of training samples to use (for quick testing)")
+    parser.add_argument('--visualize_augmentation', action='store_true',
+                        help="Visualize data augmentation effects on sample images")
     return parser.parse_args()
 
 
@@ -101,6 +106,7 @@ def display_time(elapsed_time):
         elapsed_time /= 3600
         print(f"Temps d'entraînement total: {elapsed_time:.2f} heures")
 
+
 if __name__ == "__main__":
 
     args = argument_parser()
@@ -110,19 +116,64 @@ if __name__ == "__main__":
     val_set = args.validation
     learning_rate = args.lr
     data_augment = args.data_aug
+    use_rotation = args.rotation
+    use_elastic = args.elastic
+
+    # Affichage des options d'augmentation activées
     if data_augment:
-        print('Data augmentation activated!')
-    else:
-        print('Data augmentation NOT activated!')
+        print('Augmentation de données de base activée!')
+    if use_rotation:
+        print('Augmentation par rotation aléatoire activée!')
+    if use_elastic:
+        print('Augmentation par déformation élastique activée!')
+    if not (data_augment or use_rotation or use_elastic):
+        print('Aucune augmentation de données activée!')
 
     # set hdf5 path according your hdf5 file location
     acdc_hdf5_file = 'data/ift780_acdc.hdf5'
 
-    # Transform is used to normalize data among others
-    acdc_base_transform = transforms.Compose([
-        transforms.ToTensor()
-    ])
+    # Préparation des transformations pour ACDC
+    acdc_transforms = []
 
+    if use_rotation or use_elastic:
+
+        def transform_func(x):
+            # Appliquer les transformations d'augmentation
+            transform = ACDCJointTransform(
+                rotation=use_rotation,
+                elastic=use_elastic,
+                rotation_degrees=60,
+                elastic_alpha=50.0,
+                elastic_sigma=5.0
+            )
+
+
+
+            result = transform(x)
+
+            # Assurer le format correct pour PyTorch (NCHW)
+            if isinstance(result, torch.Tensor):
+                if len(result.shape) == 2:  # (H, W)
+                    result = result.unsqueeze(0)  # Ajouter dimension canal -> (1, H, W)
+                elif len(result.shape) == 3 and result.shape[2] <= 4:  # (H, W, C)
+                    result = result.permute(2, 0, 1)  # -> (C, H, W)
+            else:  # Numpy array
+                if len(result.shape) == 2:  # (H, W)
+                    result = np.expand_dims(result, 0)  # -> (1, H, W)
+                    result = torch.from_numpy(result).float()
+                elif len(result.shape) == 3 and result.shape[2] <= 4:  # (H, W, C)
+                    result = np.transpose(result, (2, 0, 1))  # -> (C, H, W)
+                    result = torch.from_numpy(result).float()
+
+            return result
+
+
+        acdc_base_transform = transform_func
+    else:
+        # Sinon, utiliser seulement la conversion en tenseur
+        acdc_base_transform = transforms.ToTensor()
+
+    # Transformations pour CIFAR10/SVHN
     data_augment_transform = transforms.Compose(
         [
             transforms.RandomCrop(32),
@@ -174,6 +225,7 @@ if __name__ == "__main__":
     elif args.model == 'YourUNet':
         model = YourUNet(num_classes=4)
         args.dataset = 'acdc'
+        # Créer le dataset avec les options d'augmentation
         train_set = HDF5Dataset('train', acdc_hdf5_file, transform=acdc_base_transform)
         test_set = HDF5Dataset('test', acdc_hdf5_file, transform=acdc_base_transform)
         if args.max_samples is not None:
@@ -182,6 +234,7 @@ if __name__ == "__main__":
     elif args.model == 'YourSegNet':
         model = YourSegNet(num_classes=4)
         args.dataset = 'acdc'
+        # Créer le dataset avec les options d'augmentation
         train_set = HDF5Dataset('train', acdc_hdf5_file, transform=acdc_base_transform)
         test_set = HDF5Dataset('test', acdc_hdf5_file, transform=acdc_base_transform)
         if args.max_samples is not None:
@@ -190,6 +243,7 @@ if __name__ == "__main__":
     elif args.model == 'UNet':
         model = UNet(num_classes=4)
         args.dataset = 'acdc'
+        # Créer le dataset avec les options d'augmentation
         train_set = HDF5Dataset('train', acdc_hdf5_file, transform=acdc_base_transform)
         test_set = HDF5Dataset('test', acdc_hdf5_file, transform=acdc_base_transform)
 
@@ -224,6 +278,10 @@ if __name__ == "__main__":
 
         print("Prédiction de masques pour des images aléatoires du jeu de test")
         model_trainer.plot_image_mask_prediction()
+    elif args.visualize_augmentation:
+        # Visualiser les effets de l'augmentation de données
+        print("Visualisation des effets de l'augmentation de données...")
+        model_trainer.visualize_data_augmentation(num_samples=3)
     else:
         # Afficher des informations sur l'utilisation du GPU
         if use_cuda:
@@ -232,6 +290,7 @@ if __name__ == "__main__":
         else:
             print(
                 f"Entraînement de {model.__class__.__name__} sur {args.dataset} pour {args.num_epochs} époques utilisant CPU")
+
         start_time = time.time()
 
         model_trainer.train(num_epochs)
@@ -242,13 +301,12 @@ if __name__ == "__main__":
         final_train_loss = model_trainer.metric_values['train_loss'][-1]
         final_val_loss = model_trainer.metric_values['val_loss'][-1]
 
-        print("\n" + "=" * 20 + " RÉSULTATS FINAUX " + "=" * 20)
-        print(f"Accuracy d'entraînement finale: {(100 * final_train_acc):.4f}")
-        print(f"Accuracy de validation finale: {(100 * final_val_acc):.4f}")
+        print("\n" + "=" * 30 + " RÉSULTATS FINAUX " + "=" * 30)
+        print(f"Accuracy d'entraînement finale: {final_train_acc:.4f}")
+        print(f"Accuracy de validation finale: {final_val_acc:.4f}")
         print(f"Loss d'entraînement finale: {final_train_loss:.4f}")
         print(f"Loss de validation finale: {final_val_loss:.4f}")
-        print("=" * 60 + "\n")
-
+        print("=" * 77 + "\n")
 
         model_trainer.evaluate_on_test_set()
 
@@ -258,6 +316,3 @@ if __name__ == "__main__":
             model.save()  # save the model's weights for prediction (see help for more details)
             model_trainer.plot_image_mask_prediction()
         model_trainer.plot_metrics()
-
-
-
