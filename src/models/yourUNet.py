@@ -1,16 +1,9 @@
 # -*- coding:utf-8 -*-
 
-"""
-University of Sherbrooke
-Date:
-Authors: Mamadou Mountagha BAH & Pierre-Marc Jodoin
-License:
-Other: Suggestions are welcome
-"""
+
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from src.models.CNNBaseModel import CNNBaseModel
 
 '''
@@ -42,26 +35,26 @@ class YourUNet(CNNBaseModel):
 
         # Encoder
         in_channels = 1
-        self.conv_encoder1 = self._conv_block(in_channels=in_channels, out_channels=64)
-        self.conv_encoder2 = self._contraction_block(64, 128)
-        self.conv_encoder3 = self._contraction_block(128, 256)
-        self.conv_encoder4 = self._contraction_block(256, 512)
-        self.conv_encoder5 = self._contraction_block(512, 1024)
+        self.conv_encoder1 = self._conv_block(in_channels=in_channels, out_channels=32)
+        self.conv_encoder2 = self._contraction_block(32, 64)
+        self.conv_encoder3 = self._contraction_block(64, 128)
+        self.conv_encoder4 = self._contraction_block(128, 256)
+        self.conv_encoder5 = self._contraction_block(256, 512)
 
         # Bottleneck
-        self.bottleneck = self._bottleneck_block(1024, 1024)
+        self.bottleneck = self._bottleneck_block(512, 512)
 
         # Middle
-        self.conv_mid_decoder = nn.ConvTranspose2d(in_channels=1024, out_channels=512,
+        self.conv_mid_decoder = nn.ConvTranspose2d(in_channels=512, out_channels=256,
                                                    kernel_size=3, stride=2, padding=1, output_padding=1)
 
-        # Decoder
-        self.conv_decoder4 = self._expansion_block(1024, 512)  # 512 + 512 = 1024
-        self.conv_decoder3 = self._expansion_block(768, 256)  # 256 + 256 = 512
-        self.conv_decoder2 = self._expansion_block(384, 128)  # 128 + 128 = 256
-        self.final_layer = self._final_block(192, 64, num_classes)  # 64 + 64 = 128
+        # Decoder avec moins de canaux
+        self.conv_decoder4 = self._expansion_block(512, 256)  # 256 + 256 = 512
+        self.conv_decoder3 = self._expansion_block(384, 128)  # 128 + 128 = 256
+        self.conv_decoder2 = self._expansion_block(192, 64)
+        self.final_layer = self._final_block(96, 32, num_classes)  # 32 + 32 = 64
 
-        # Couche supplémentaire pour assurer les bonnes dimensions -
+        # Couche supplémentaire pour assurer les bonnes dimensions
         self.final_conv = nn.Conv2d(num_classes, num_classes, kernel_size=1)
 
     def forward(self, x):
@@ -146,13 +139,10 @@ class YourUNet(CNNBaseModel):
         Bloc bottleneck pour réduire la dimensionnalité
         """
         return nn.Sequential(
-            nn.Conv2d(in_channels, out_channels // 4, 1),
+            nn.Conv2d(in_channels, out_channels // 2, 1),
             nn.ReLU(),
-            nn.BatchNorm2d(out_channels // 4),
-            YourUNet._separable_conv(out_channels // 4, out_channels // 4),
-            nn.ReLU(),
-            nn.BatchNorm2d(out_channels // 4),
-            nn.Conv2d(out_channels // 4, out_channels, 1),
+            nn.BatchNorm2d(out_channels // 2),
+            YourUNet._separable_conv(out_channels // 2, out_channels),
             nn.ReLU(),
             nn.BatchNorm2d(out_channels)
         )
@@ -164,7 +154,6 @@ class YourUNet(CNNBaseModel):
         """
         return nn.Sequential(
             YourUNet._residual_block(in_channels, out_channels),
-            YourUNet._residual_block(out_channels, out_channels),
             nn.ConvTranspose2d(out_channels, out_channels, kernel_size=3, stride=2, padding=1, output_padding=1)
         )
 
@@ -175,8 +164,7 @@ class YourUNet(CNNBaseModel):
         """
         return nn.Sequential(
             YourUNet._residual_block(in_channels, mid_channels),
-            YourUNet._residual_block(mid_channels, mid_channels),
-            nn.Conv2d(mid_channels, out_channels, 1)  # Sortie finale avec le nombre de classes
+            nn.Conv2d(mid_channels, out_channels, 1)
         )
 
 
