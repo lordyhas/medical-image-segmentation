@@ -65,7 +65,7 @@ if __name__ == "__main__":
     model = YourUNet(num_classes=4)
 
     # Génère un graphe interactif (Jupyter)
-    hl.build_graph(model, torch.zeros([1, 1, 256, 256])).save("unet_arch.png")
+    #hl.build_graph(model, torch.zeros([1, 1, 256, 256])).save("unet_arch.png")
     batch_size = args.batch_size
     num_epochs = args.num_epochs
     val_set = args.validation
@@ -91,25 +91,48 @@ if __name__ == "__main__":
     )
     data_augment_transform2 = transforms.Compose(
         [
-        transforms.RandomCrop(32),
-        transforms.RandomAffine(5),
+        transforms.RandomCrop(32, padding=4),
+        transforms.RandomAffine(10),
+        transforms.RandomHorizontalFlip(),
         transforms.RandomRotation(degrees=10),
         transforms.ToTensor(),
         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
         ]
+    )
+    data_augment_transform3 = transforms.Compose(
+        [
+        transforms.RandomCrop(32, padding=4),
+        transforms.RandomAffine(10),
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomVerticalFlip(),
+        transforms.RandomRotation(degrees=15),
+        transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2),
+        transforms.ToTensor(),
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+        ]
     ) 
+    base_transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+        ]
+    ) 
+
     # set hdf5 path 
     acdc_path = '../data/ift780_acdc.hdf5'
-    base_transform = transforms.Compose([
+    '''base_transform = transforms.Compose([
         transforms.ToTensor()
-    ])
+    ])'''
 
     transform = base_transform
 
     if data_augment == 1:
         transform = transforms.Compose([data_augment_transform1, transform])
     elif data_augment == 2:
+        print("Data augmentation 2")
         transform = transforms.Compose([data_augment_transform2, transform])
+    elif data_augment == 3:
+        print("Data augmentation 3")
+        transform = transforms.Compose([data_augment_transform3, transform])
 
     if args.dataset == 'cifar10':
         # Download the train and test set and apply transform on it
