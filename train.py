@@ -147,8 +147,6 @@ if __name__ == "__main__":
                 elastic_sigma=5.0
             )
 
-
-
             result = transform(x)
 
             # Assurer le format correct pour PyTorch (NCHW)

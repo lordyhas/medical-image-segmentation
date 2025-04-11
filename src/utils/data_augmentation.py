@@ -59,7 +59,7 @@ class ACDCJointTransform:
         elif len(original_shape) == 3 and original_shape[2] <= 4:  # H,W,C
             img = img.permute(2, 0, 1)
 
-        # Fixer la graine pour les transformations
+        # Fixer le seed pour les transformations
         seed = random.randint(0, 2 ** 32 - 1)
 
         # Appliquer la rotation si demandée
