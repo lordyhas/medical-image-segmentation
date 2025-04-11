@@ -10,7 +10,8 @@ Other: Suggestions are welcome
 """
 
 import argparse
-
+import torch
+import hiddenlayer as hl
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -21,7 +22,7 @@ from models.UNet import UNet
 from manage.CNNTrainTestManager import CNNTrainTestManager, optimizer_setup
 from manage.HDF5Dataset import HDF5Dataset
 from torchvision import datasets
-from utils.utils import dice_loss
+from utils.losses import *
 
 def argument_parser():
     """
@@ -38,7 +39,7 @@ def argument_parser():
     parser.add_argument('--model', type=str, default="CnnVanilla",
                         choices=["CnnVanilla", "VggNet", "AlexNet", "ResNet", "yourUNet", "yourSegNet", "UNet"])
     parser.add_argument('--dataset', type=str, default="cifar10", choices=["cifar10", "svhn","acdc"])
-    parser.add_argument('--loss', type=str, default="CE")
+    parser.add_argument('--loss', type=str, default="CE",choices=["CE", "dice" , "diceCE"])
     parser.add_argument('--batch_size', type=int, default=20,
                         help='The size of the training batch')
     parser.add_argument('--optimizer', type=str, default="Adam", choices=["Adam", "SGD"],
@@ -61,6 +62,10 @@ if __name__ == "__main__":
 
     args = argument_parser()
 
+    model = YourUNet(num_classes=4)
+
+    # Génère un graphe interactif (Jupyter)
+    hl.build_graph(model, torch.zeros([1, 1, 256, 256])).save("unet_arch.png")
     batch_size = args.batch_size
     num_epochs = args.num_epochs
     val_set = args.validation
@@ -134,7 +139,9 @@ if __name__ == "__main__":
     if args.loss == 'CE':
       loss_fn = nn.CrossEntropyLoss()
     elif args.loss == 'dice':
-      loss_fn = dice_loss
+      loss_fn = DiceLoss()
+    elif args.loss == 'diceCE':
+        loss_fn = DiceCELoss()
 
     else:
           raise Exception("Loss function not found!")
