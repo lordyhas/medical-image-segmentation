@@ -91,8 +91,9 @@ if __name__ == "__main__":
     )
     data_augment_transform2 = transforms.Compose(
         [
-        transforms.RandomCrop(32),
-        transforms.RandomAffine(5),
+        transforms.RandomCrop(32, padding=4),
+        transforms.RandomAffine(10),
+        transforms.RandomHorizontalFlip(),
         transforms.RandomRotation(degrees=10),
         transforms.ToTensor(),
         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
@@ -107,6 +108,7 @@ if __name__ == "__main__":
     if data_augment == 1:
         transform = transforms.Compose([data_augment_transform1, transform])
     elif data_augment == 2:
+        print("Data augmentation 2")
         transform = transforms.Compose([data_augment_transform2, transform])
 
 
