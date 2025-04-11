@@ -1,13 +1,5 @@
 # -*- coding:utf-8 -*-
 
-"""
-University of Sherbrooke
-Date:
-Authors: Mamadou Mountagha BAH & Pierre-Marc Jodoin
-License:
-Other: Suggestions are welcome
-"""
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F

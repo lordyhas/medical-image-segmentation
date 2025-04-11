@@ -1,7 +1,6 @@
 # -*- coding:utf-8 -*-
 
 
-
 import torch
 import torch.nn as nn
 from src.models.CNNBaseModel import CNNBaseModel
@@ -13,7 +12,6 @@ Ajouter du code ici pour faire fonctionner le réseau YourUNet.  Un réseau insp
 mais comprenant des connexions résiduelles et denses.  Soyez originaux et surtout... amusez-vous!
 
 '''
-
 
 class YourUNet(CNNBaseModel):
     """
@@ -48,7 +46,7 @@ class YourUNet(CNNBaseModel):
         self.conv_mid_decoder = nn.ConvTranspose2d(in_channels=512, out_channels=256,
                                                    kernel_size=3, stride=2, padding=1, output_padding=1)
 
-        # Decoder avec moins de canaux
+        # Decoder
         self.conv_decoder4 = self._expansion_block(512, 256)  # 256 + 256 = 512
         self.conv_decoder3 = self._expansion_block(384, 128)  # 128 + 128 = 256
         self.conv_decoder2 = self._expansion_block(192, 64)
@@ -84,8 +82,6 @@ class YourUNet(CNNBaseModel):
         decode_block1 = torch.cat((cat_layer1, encode_block1), 1)
         final_layer = self.final_layer(decode_block1)
 
-        # Nous retournons directement le résultat sans softmax
-        # Le softmax sera appliqué dans la fonction de perte
         return final_layer
 
     @staticmethod
@@ -166,7 +162,6 @@ class YourUNet(CNNBaseModel):
             YourUNet._residual_block(in_channels, mid_channels),
             nn.Conv2d(mid_channels, out_channels, 1)
         )
-
 
 '''
 Fin de votre code.
