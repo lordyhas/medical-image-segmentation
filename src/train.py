@@ -65,7 +65,7 @@ if __name__ == "__main__":
     model = YourUNet(num_classes=4)
 
     # Génère un graphe interactif (Jupyter)
-    hl.build_graph(model, torch.zeros([1, 1, 256, 256])).save("unet_arch.png")
+    #hl.build_graph(model, torch.zeros([1, 1, 256, 256])).save("unet_arch.png")
     batch_size = args.batch_size
     num_epochs = args.num_epochs
     val_set = args.validation
@@ -119,9 +119,9 @@ if __name__ == "__main__":
 
     # set hdf5 path 
     acdc_path = '../data/ift780_acdc.hdf5'
-    base_transform = transforms.Compose([
+    '''base_transform = transforms.Compose([
         transforms.ToTensor()
-    ])
+    ])'''
 
     transform = base_transform
 
