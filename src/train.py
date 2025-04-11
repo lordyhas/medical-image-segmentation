@@ -116,7 +116,7 @@ if __name__ == "__main__":
         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
         ]
     ) 
-    
+
     # set hdf5 path 
     acdc_path = '../data/ift780_acdc.hdf5'
     base_transform = transforms.Compose([
@@ -124,9 +124,7 @@ if __name__ == "__main__":
     ])
 
     transform = base_transform
-<<<<<<< src/train.py
 
-=======
     if data_augment == 1:
         transform = transforms.Compose([data_augment_transform1, transform])
     elif data_augment == 2:
