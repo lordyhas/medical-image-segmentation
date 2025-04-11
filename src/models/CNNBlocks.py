@@ -49,9 +49,9 @@ class DenseBlock(nn.Module):
     and then concatenate the output with the original input
     """
 
-    def __init__(self, in_channels):
+    def __init__(self, in_channels,dilation=1):
         super(DenseBlock, self).__init__()
-        self.conv1 = nn.Conv2d(in_channels=in_channels, out_channels=in_channels, kernel_size=3, stride=1, padding=1)
+        self.conv1 = nn.Conv2d(in_channels=in_channels, out_channels=in_channels, kernel_size=3, stride=1, padding=dilation, dilation=dilation)
         self.bn1 = nn.BatchNorm2d(in_channels)
         self.relu = nn.ReLU(inplace=True)
 

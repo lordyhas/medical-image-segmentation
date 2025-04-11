@@ -237,6 +237,21 @@ def mean_dice(input: Tensor, target: Tensor, reduction: str = 'mean') -> Tensor:
     mean_dice = torch.mean(dices, dim=0)  # Compute the mean dice over all classes
     return mean_dice
 
+def dice_loss(input: Tensor, target: Tensor, reduction: str = 'mean') -> Tensor:
+    """ Computes the dice loss between input and target.
+
+    Args:
+        input: (N, C, H, W), raw, unnormalized scores for each class.
+        target: (N, H, W), where each value is 0 <= targets[i] <= C-1.
+        reduction: specifies the reduction to apply to the output:
+                   ``'none'``: no reduction will be applied,
+                   ``'mean'``: the sum of the output will be divided by the number of elements in the output.
+
+    Returns:
+        (1,) or (N,), the 1 - mean dice score for the classes in the target, reduced or for each sample.
+    """
+    return 1 - mean_dice(input, target)
+
 
 def convert_mask_to_rgb_image(img):
     """
