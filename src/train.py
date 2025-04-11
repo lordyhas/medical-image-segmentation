@@ -51,7 +51,7 @@ def argument_parser():
                         help='Percentage of training data to use for validation')
     parser.add_argument('--lr', type=float, default=0.001,
                         help='Learning rate')
-    parser.add_argument('--data_aug', action='store_true',
+    parser.add_argument('--data_aug', type=int, default=0,
                         help="Data augmentation")
     parser.add_argument('--predict', type=str,
                         help="Name of the file containing model weights used to make "
@@ -81,7 +81,7 @@ if __name__ == "__main__":
         transforms.ToTensor()
     ])
 
-    data_augment_transform = transforms.Compose(
+    data_augment_transform1 = transforms.Compose(
         [
             transforms.RandomCrop(32),
             transforms.RandomHorizontalFlip(),
@@ -89,14 +89,26 @@ if __name__ == "__main__":
             transforms.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1),
         ]
     )
+    data_augment_transform2 = transforms.Compose(
+        [
+        transforms.RandomCrop(32),
+        transforms.RandomAffine(5),
+        transforms.RandomRotation(degrees=10),
+        transforms.ToTensor(),
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+        ]
+    ) 
     base_transform = transforms.Compose([
         transforms.ToTensor(),
         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
     ])
 
     transform = base_transform
-    if data_augment:
-        transform = transforms.Compose([data_augment_transform, transform])
+    if data_augment == 1:
+        transform = transforms.Compose([data_augment_transform1, transform])
+    elif data_augment == 2:
+        transform = transforms.Compose([data_augment_transform2, transform])
+
 
     if args.dataset == 'cifar10':
         # Download the train and test set and apply transform on it
