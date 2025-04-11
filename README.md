@@ -18,9 +18,14 @@ Ce projet implémente des réseaux de neurones pour la segmentation d'images IRM
 
 2. `src/models/YourSegNet.py`
    - Architecture non-symétrique inspirée de DeepLabV3 avec :
-     - Encoder profond avec atrous convolutions
-     - Decoder léger avec upsampling progressif
-     - Skip connections asymétriques
+     - Encoder profond avec atrous convolutions et blocs résiduels
+     - Decoder léger avec upsampling progressif et blocs denses
+     - Skip connections asymétriques améliorées
+     - Blocs bottleneck pour réduire les paramètres
+     - Blocs résiduels pour faciliter l'apprentissage profond
+     - Blocs denses pour une meilleure fusion des caractéristiques
+     - Convolutions dilatées (atrous) pour capturer les contextes multi-échelles
+     - Mécanisme de fusion optimisé pour les skip connections
 
 3. `src/utils/losses.py`
    - Nouvelles fonctions de perte :
@@ -53,17 +58,7 @@ Ce projet implémente des réseaux de neurones pour la segmentation d'images IRM
    - Migration des transformations personnalisées vers les standards torchvision
    - Amélioration des paramètres pour des effets plus visibles
 
-3. `src/utils/data_augmentation.py`
-   - Implémentation initiale des deux techniques d'augmentation:
-     - `SimpleRandomRotation` : Rotation aléatoire des images et masques
-     - `SimpleElasticDeformation` : Déformation élastique pour simuler des variations anatomiques
-
-4. `src/manage/HDF5Dataset.py`
-   - Intégration des méthodes d'augmentation dans le pipeline de chargement de données
-   - Implémentation de `apply_random_rotation` et `apply_elastic_deformation`
-   - Conservation de la cohérence entre images et masques correspondants
-
-5. `src/manage/CNNTrainTestManager.py`
+3. `src/manage/CNNTrainTestManager.py`
    - Implémentation de la méthode `visualize_data_augmentation` pour visualiser les effets des augmentations
    - Mise à jour pour utiliser les nouvelles transformations de torchvision
 
@@ -128,31 +123,30 @@ Les images générées pour l'analyse des augmentations sont sauvegardées dans 
 
 ## Description des techniques d'augmentation
 
-### Rotation aléatoire
-Cette technique applique une rotation aléatoire à l'image et à son masque de segmentation correspondant :
-- Angle de rotation aléatoire dans la plage [-60°, 60°] (paramètre amélioré)
-- Utilisation de la même graine aléatoire pour l'image et le masque pour maintenir la cohérence
-- Implémentée via la fonction `functional.rotate()` de torchvision
-- Interpolation bilinéaire pour une meilleure qualité d'image
+### Transformations standard de torchvision
+L'augmentation de données utilise maintenant les transformations standard de torchvision :
+- `transforms.RandomRotation` pour la rotation aléatoire
+- `transforms.ElasticTransform` pour la déformation élastique
+- `transforms.RandomAffine` pour les transformations affines
+- `transforms.RandomHorizontalFlip` pour le retournement horizontal
+- `transforms.RandomVerticalFlip` pour le retournement vertical
 
-### Déformation élastique
-Cette technique simule des variations anatomiques par déformation élastique non linéaire :
-- Génère un champ de déplacement aléatoire
-- Applique un filtre gaussien pour lisser les déplacements
-- Paramètres optimisés : α=50.0 (amplitude) et σ=5.0 (lissage)
-- Utilise la classe `ElasticTransform` de torchvision quand disponible
-- Mise en œuvre robuste qui préserve la cohérence entre image et masque
+### Classe ACDCJointTransform
+Cette classe encapsule toutes les transformations et assure :
+- La cohérence entre les images et leurs masques de segmentation
+- La gestion automatique des formats d'entrée/sortie
+- L'application des mêmes transformations aux paires image-masque
+- La préservation de la qualité des images médicales
 
 ### Améliorations apportées
-- Migration des transformations personnalisées vers les standards de torchvision
-- Encapsulation dans une classe modulaire `ACDCJointTransform`
-- Gestion automatique des formats d'entrée/sortie (numpy/tenseur)
-- Paramètres ajustés pour des effets plus visibles et efficaces
-- Structure de code modulaire permettant une maintenance et extension faciles
+- Migration complète vers les transformations standard de torchvision
+- Meilleure gestion de la mémoire et des performances
+- Paramètres optimisés pour les images IRM cardiaques
+- Structure modulaire facilitant l'ajout de nouvelles transformations
+- Documentation claire des paramètres et effets des transformations
 
-Ces techniques améliorent significativement la capacité de généralisation des modèles, en particulier lorsque la quantité de données d'entraînement est limitée.
-
-## Résultats
+Ces améliorations permettent une augmentation de données plus robuste et efficace, tout en maintenant la qualité des images médicales.
+### Résultats
 ![aug.png](figures/augmentation_example_1-ex.png)
 
 
@@ -170,9 +164,41 @@ La perte Focal est conçue pour gérer le déséquilibre des classes :
 - Augmente le poids des exemples difficiles
 - Paramètres ajustables (alpha et gamma) pour contrôler le focus
 
+## Améliorations de l'architecture YourSegNet
+
+L'architecture YourSegNet a été significativement améliorée avec plusieurs composants clés :
+
+### Encoder amélioré
+- Utilisation de blocs résiduels pour faciliter l'apprentissage profond
+- Intégration de convolutions dilatées (atrous) pour capturer les contextes multi-échelles
+- Blocs bottleneck pour réduire le nombre de paramètres tout en maintenant la capacité du modèle
+- Structure hiérarchique avec downsampling progressif
+
+### Decoder optimisé
+- Blocs denses pour une meilleure fusion des caractéristiques
+- Upsampling progressif avec convolutions transposées
+- Skip connections asymétriques améliorées pour préserver les détails fins
+- Mécanisme de fusion optimisé pour combiner les caractéristiques de différents niveaux
+
+### Innovations architecturales
+- Combinaison intelligente de blocs résiduels et denses
+- Utilisation stratégique des convolutions atrous pour augmenter le champ réceptif
+- Architecture non-symétrique pour une meilleure efficacité
+- Pipeline de traitement optimisé pour la segmentation d'images IRM cardiaques
+
+Ces améliorations permettent au modèle de :
+- Capturer plus efficacement les caractéristiques multi-échelles
+- Réduire le nombre de paramètres tout en maintenant la performance
+- Améliorer la précision de segmentation des structures cardiaques
+- Faciliter l'entraînement du réseau profond
 
 ## Courbes d'entraînement
 [À remplir après l'entraînement des modèles]
 
-![fig1.png](figures/YourSegNet_metrics-dice-e20.png)
+![fig1.png](figures/YourSegNet_metrics-dice-e10.png)
+
+
+
+
+
 
