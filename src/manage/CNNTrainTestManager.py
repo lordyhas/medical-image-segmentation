@@ -226,7 +226,9 @@ class CNNTrainTestManager(object):
         ax2.set_xlabel('Epochs')
         ax2.set_ylabel('accuracy')
         ax2.legend()
-        f.savefig('fig1.png')
+        model_name = self.model.__class__.__name__
+        f.savefig(f"{model_name}_fig1.png")
+
         plt.show()
 
     def plot_image_mask_prediction(self):

@@ -9,7 +9,8 @@ Other: Suggestions are welcome
 """
 
 import torch.nn as nn
-from CNNBaseModel import CNNBaseModel
+from models.CNNBaseModel import CNNBaseModel
+
 
 
 class VggNet(CNNBaseModel):

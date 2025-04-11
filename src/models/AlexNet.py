@@ -10,7 +10,8 @@ Other: Suggestions are welcome
 
 import torch
 import torch.nn as nn
-from CNNBaseModel import CNNBaseModel
+from models.CNNBaseModel import CNNBaseModel
+from models.CNNBlocks import BottleneckBlock, DenseBlock, ResidualBlock
 
 
 class AlexNet(CNNBaseModel):
