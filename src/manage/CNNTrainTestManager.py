@@ -65,6 +65,8 @@ class CNNTrainTestManager(object):
         self.use_cuda = use_cuda
         self.metric_values = {}
 
+        self.best_validation_accuracy = 0
+
     def train(self, num_epochs):
         """
         Train the model for num_epochs times
@@ -165,6 +167,10 @@ class CNNTrainTestManager(object):
         # displays metrics
         print('Validation loss %.3f' % (validation_loss / len(val_loader)))
         print('Validation accuracy %.3f' % (np.mean(validation_accuracies)))
+
+        if self.best_validation_accuracy < np.mean(validation_accuracies):
+            torch.save(self.model.state_dict(), "best_model.pth")
+            self.best_validation_accuracy = np.mean(validation_accuracies)
 
         # switch back to train mode
         self.model.train()
