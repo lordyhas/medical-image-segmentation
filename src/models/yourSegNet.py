@@ -69,7 +69,6 @@ class YourSegNet(CNNBaseModel):
         self.decoder1 = self._decoder_block(128, 64)
 
         # Couches de fusion pour les skip connections
-        # Important: assurez-vous que la sortie a le même nombre de canaux que l'entrée du decoder suivant
         self.fusion3 = self._fusion_block(256 + 256, out_channels=256)  # Sortie: 256 canaux pour decoder2
         self.fusion2 = self._fusion_block(128 + 128, out_channels=128)  # Sortie: 128 canaux pour decoder1
         self.fusion1 = self._fusion_block(64 + 64, out_channels=64)  # Sortie: 64 canaux pour la couche finale
