@@ -194,8 +194,10 @@ Ces améliorations permettent au modèle de :
 
 ## Courbes d'entraînement
 [À remplir après l'entraînement des modèles]
-
-![fig1.png](figures/YourSegNet_metrics-dice-e10.png)
+### YourSegNet
+![fig1.png](figures/YourSegNet_metrics.png)
+### YourUNet
+![fig3.png](figures/YourUNet_metrics.png)
 
 
 
