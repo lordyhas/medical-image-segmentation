@@ -82,6 +82,8 @@ def argument_parser():
                         help="Activate random rotation for data augmentation")
     parser.add_argument('--elastic', action='store_true',
                         help="Activate elastic deformation for data augmentation")
+    parser.add_argument('--flip_crop', action='store_true',
+                        help="Activate elastic deformation for data augmentation")
     parser.add_argument('--predict', type=str,
                         help="Name of the file containing model weights used to make "
                              "segmentation prediction on test data")
@@ -118,6 +120,7 @@ if __name__ == "__main__":
     data_augment = args.data_aug
     use_rotation = args.rotation
     use_elastic = args.elastic
+    use_flip_crop = args.flip_crop
 
     # Affichage des options d'augmentation activées
     if data_augment:
@@ -136,7 +139,6 @@ if __name__ == "__main__":
     acdc_transforms = []
 
     if use_rotation or use_elastic:
-
         def transform_func(x):
             # Appliquer les transformations d'augmentation
             transform = ACDCJointTransform(
@@ -165,8 +167,19 @@ if __name__ == "__main__":
 
             return result
 
-
         acdc_base_transform = transform_func
+
+    elif use_flip_crop:
+        flip_crop_transform = transforms.Compose(
+            [
+                transforms.RandomCrop(200, padding=4),
+                transforms.RandomAffine(10),
+                transforms.RandomHorizontalFlip(),
+                transforms.RandomVerticalFlip(),
+                transforms.RandomRotation(degrees=15),
+            ]
+        )
+        acdc_base_transform = flip_crop_transform
     else:
         # Sinon, utiliser seulement la conversion en tenseur
         acdc_base_transform = transforms.ToTensor()
