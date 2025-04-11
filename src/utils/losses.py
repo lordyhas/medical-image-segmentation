@@ -1,10 +1,18 @@
 import torch.nn as nn
 import torch.nn.functional as F
 
-from loss.DiceLoss import DiceLoss
+from utils.utils import mean_dice
 
 
-# Idea from https://www.kaggle.com/code/bigironsphere/loss-function-library-keras-pytorch
+class DiceLoss(nn.Module):
+
+    def __init__(self):
+        super(DiceLoss, self).__init__()
+
+    def forward(self, inputs, targets):
+        return 1 - mean_dice(inputs, targets)
+
+
 
 class DiceCELoss(nn.Module):
 
