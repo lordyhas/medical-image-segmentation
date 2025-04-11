@@ -9,7 +9,7 @@ Other: Suggestions are welcome
 """
 
 import torch.nn as nn
-from models.CNNBaseModel import CNNBaseModel
+from src.models.CNNBaseModel import CNNBaseModel
 
 
 class CnnVanilla(CNNBaseModel):

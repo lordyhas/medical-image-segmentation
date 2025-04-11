@@ -1,19 +1,9 @@
 # -*- coding:utf-8 -*-
 
-"""
-University of Sherbrooke
-Date:
-Authors: Mamadou Mountagha BAH & Pierre-Marc Jodoin
-License:
-Other: Suggestions are welcome
-"""
 
 import torch
 import torch.nn as nn
-from models.CNNBaseModel import CNNBaseModel
-from models.CNNBlocks import BottleneckBlock, DenseBlock, ResidualBlock
-import torchvision
-import torch.nn.functional as F
+from src.models.CNNBaseModel import CNNBaseModel
 
 '''
 TODO
@@ -23,148 +13,155 @@ mais comprenant des connexions résiduelles et denses.  Soyez originaux et surto
 
 '''
 
-
 class YourUNet(CNNBaseModel):
     """
-     Class that implements a brand new UNet segmentation network
+    Version améliorée du UNet avec :
+    - Convolutions séparables
+    - Couches résiduelles
+    - Blocs bottleneck
     """
 
     def __init__(self, num_classes=4, init_weights=True):
+        """
+        Builds yourUNet  model.
+        Args:
+            num_classes(int): number of classes. default 10(cifar10 or svhn)
+            init_weights(bool): when true uses _initialize_weights function to initialize
+            network's weights.
+        """
         super().__init__(num_classes, init_weights)
 
-        input_channels = 1  # images en niveaux de gris
+        # Encoder
+        in_channels = 1
+        self.conv_encoder1 = self._conv_block(in_channels=in_channels, out_channels=32)
+        self.conv_encoder2 = self._contraction_block(32, 64)
+        self.conv_encoder3 = self._contraction_block(64, 128)
+        self.conv_encoder4 = self._contraction_block(128, 256)
+        self.conv_encoder5 = self._contraction_block(256, 512)
 
-        # ENCODER
-        self.encoder_block1 = nn.Sequential(
-            self._conv_block(input_channels, 64),
-            self._contraction_block(64, 128),
-            ResidualBlock(128, 128),
-            DenseBlock(128)
-        )
-
-        self.encoder_block2 = nn.Sequential(
-            nn.Conv2d(256, 256, kernel_size=3, padding=2),
-            nn.ReLU(),
-            nn.BatchNorm2d(256),
-            BottleneckBlock(256)
-        )
-
-        self.encoder_block3 = nn.Sequential(
-            nn.MaxPool2d(kernel_size=2, stride=2),
-            ResidualBlock(256, 512, stride=1),
-            nn.BatchNorm2d(512),
-            DenseBlock(512)
-        )
-
-        # MIDDLE
-        self.middle_upconv = nn.ConvTranspose2d(1024, 256, kernel_size=3, stride=2, padding=1, output_padding=1)
-
-        # DECODER
-        self.decoder_block1 = nn.Sequential(
-            self._expansion_block(512, 256),
-            ResidualBlock(256, 256),
-            nn.BatchNorm2d(256)
-        )
-
-        self.decoder_block2 = nn.Sequential(
-            nn.ConvTranspose2d(512, 256, kernel_size=2, stride=2),
-            nn.ReLU(),
-            ResidualBlock(256, 128),
-            DenseBlock(128),
-            nn.ConvTranspose2d(256, 128, kernel_size=4, stride=4),
-            nn.ReLU()
-        )
-
-        self.final_output_block = self._final_block(128, 64, num_classes)
-
-    def forward(self, x):
-        """
-        Forward pass of the YourUNet model
-        """
-        # Encode
-        enc1 = self.encoder_block1(x)
-        enc2 = self.encoder_block2(enc1)
-        enc3 = self.encoder_block3(enc2)
+        # Bottleneck
+        self.bottleneck = self._bottleneck_block(512, 512)
 
         # Middle
-        mid = self.middle_upconv(enc3)
+        self.conv_mid_decoder = nn.ConvTranspose2d(in_channels=512, out_channels=256,
+                                                   kernel_size=3, stride=2, padding=1, output_padding=1)
 
-        # Decode
-        dec_input1 = torch.cat((mid, enc2), dim=1)
-        dec1 = self.decoder_block1(dec_input1)
+        # Decoder
+        self.conv_decoder4 = self._expansion_block(512, 256)  # 256 + 256 = 512
+        self.conv_decoder3 = self._expansion_block(384, 128)  # 128 + 128 = 256
+        self.conv_decoder2 = self._expansion_block(192, 64)
+        self.final_layer = self._final_block(96, 32, num_classes)  # 32 + 32 = 64
 
-        dec_input2 = torch.cat((dec1, enc1), dim=1)
-        dec2 = self.decoder_block2(dec_input2)
+        # Couche supplémentaire pour assurer les bonnes dimensions
+        self.final_conv = nn.Conv2d(num_classes, num_classes, kernel_size=1)
 
-        output = self.final_output_block(dec2)
-        return output
+    def forward(self, x):
+        # Encode
+        encode_block1 = self.conv_encoder1(x)
+        encode_block2 = self.conv_encoder2(encode_block1)
+        encode_block3 = self.conv_encoder3(encode_block2)
+        encode_block4 = self.conv_encoder4(encode_block3)
+        encode_block5 = self.conv_encoder5(encode_block4)
+
+        # Bottleneck
+        bottleneck = self.bottleneck(encode_block5)
+
+        # Middle
+        decode_middle = self.conv_mid_decoder(bottleneck)
+
+        # Decode with residual connections
+        decode_block4 = torch.cat((decode_middle, encode_block4), 1)
+        cat_layer3 = self.conv_decoder4(decode_block4)
+
+        decode_block3 = torch.cat((cat_layer3, encode_block3), 1)
+        cat_layer2 = self.conv_decoder3(decode_block3)
+
+        decode_block2 = torch.cat((cat_layer2, encode_block2), 1)
+        cat_layer1 = self.conv_decoder2(decode_block2)
+
+        decode_block1 = torch.cat((cat_layer1, encode_block1), 1)
+        final_layer = self.final_layer(decode_block1)
+
+        return final_layer
+
+    @staticmethod
+    def _separable_conv(in_channels, out_channels, kernel_size=3):
+        """
+        Implémente une convolution séparable (depthwise + pointwise)
+        """
+        return nn.Sequential(
+            nn.Conv2d(in_channels, in_channels, kernel_size, padding=kernel_size // 2, groups=in_channels),
+            nn.Conv2d(in_channels, out_channels, 1)
+        )
+
+    @staticmethod
+    def _residual_block(in_channels, out_channels):
+        """
+        Bloc résiduel avec convolutions séparables
+        """
+        return nn.Sequential(
+            YourUNet._separable_conv(in_channels, out_channels),
+            nn.ReLU(),
+            nn.BatchNorm2d(out_channels),
+            YourUNet._separable_conv(out_channels, out_channels),
+            nn.ReLU(),
+            nn.BatchNorm2d(out_channels)
+        )
 
     @staticmethod
     def _conv_block(in_channels, out_channels, kernel_size=3):
         """
-        Bloc de convolution standard avec MaxPool
+        Bloc de convolution avec connexions résiduelles
         """
         return nn.Sequential(
-            nn.Conv2d(in_channels, out_channels, kernel_size, padding=1),
-            nn.ReLU(),
-            nn.BatchNorm2d(out_channels),
-            nn.Conv2d(out_channels, out_channels, kernel_size, padding=1),
-            nn.ReLU(),
-            nn.BatchNorm2d(out_channels),
-            nn.MaxPool2d(kernel_size=2)
+            YourUNet._residual_block(in_channels, out_channels),
+            YourUNet._residual_block(out_channels, out_channels)
         )
 
     @staticmethod
     def _contraction_block(in_channels, out_channels, kernel_size=3):
         """
-        Bloc de contraction avec double MaxPool
+        Bloc de contraction avec convolutions séparables
         """
         return nn.Sequential(
-            nn.Conv2d(in_channels, out_channels, kernel_size, padding=1),
-            nn.ReLU(),
-            nn.BatchNorm2d(out_channels),
             nn.MaxPool2d(kernel_size=2),
-            nn.Conv2d(out_channels, out_channels, kernel_size, padding=1),
+            YourUNet._residual_block(in_channels, out_channels),
+            YourUNet._residual_block(out_channels, out_channels)
+        )
+
+    @staticmethod
+    def _bottleneck_block(in_channels, out_channels):
+        """
+        Bloc bottleneck pour réduire la dimensionnalité
+        """
+        return nn.Sequential(
+            nn.Conv2d(in_channels, out_channels // 2, 1),
             nn.ReLU(),
-            nn.BatchNorm2d(out_channels),
-            nn.MaxPool2d(kernel_size=2)
+            nn.BatchNorm2d(out_channels // 2),
+            YourUNet._separable_conv(out_channels // 2, out_channels),
+            nn.ReLU(),
+            nn.BatchNorm2d(out_channels)
         )
 
     @staticmethod
     def _expansion_block(in_channels, out_channels, kernel_size=3):
         """
-        Bloc d'expansion avec upsampling par convolution transposée
+        Bloc d'expansion avec convolutions séparables
         """
         return nn.Sequential(
-            nn.Conv2d(in_channels, out_channels, kernel_size, padding=1),
-            nn.ReLU(),
-            nn.BatchNorm2d(out_channels),
-            nn.Conv2d(out_channels, out_channels, kernel_size, padding=1),
-            nn.ReLU(),
-            nn.BatchNorm2d(out_channels),
-            nn.ConvTranspose2d(out_channels, out_channels, kernel_size=3, stride=1, padding=1),
-            nn.ReLU(),
-            nn.BatchNorm2d(out_channels)
+            YourUNet._residual_block(in_channels, out_channels),
+            nn.ConvTranspose2d(out_channels, out_channels, kernel_size=3, stride=2, padding=1, output_padding=1)
         )
 
     @staticmethod
     def _final_block(in_channels, mid_channels, out_channels, kernel_size=3):
         """
-        Bloc final de sortie du modèle YourUNet
+        Bloc final avec convolutions séparables
         """
         return nn.Sequential(
-            nn.Conv2d(in_channels, mid_channels, kernel_size, padding=1),
-            nn.ReLU(),
-            nn.BatchNorm2d(mid_channels),
-            nn.Conv2d(mid_channels, mid_channels, kernel_size, padding=1),
-            nn.ReLU(),
-            nn.BatchNorm2d(mid_channels),
-            nn.Conv2d(mid_channels, out_channels, kernel_size, padding=1),
-            nn.ReLU(),
-            nn.BatchNorm2d(out_channels)
+            YourUNet._residual_block(in_channels, mid_channels),
+            nn.Conv2d(mid_channels, out_channels, 1)
         )
-
-
 
 '''
 Fin de votre code.

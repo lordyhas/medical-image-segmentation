@@ -11,19 +11,20 @@ Other: Suggestions are welcome
 import warnings
 import torch
 import numpy as np
-from manage.DataManager import DataManager
+import os
+from src.manage.DataManager import DataManager
 from typing import Callable, Type
 from tqdm import tqdm
-from models.UNet import UNet
-from models.yourUNet import YourUNet
-from models.yourSegNet import YourSegNet
-from utils.utils import mean_dice, convert_mask_to_rgb_image
+from src.models.UNet import UNet
+from src.models.yourUNet import YourUNet
+from src.models.yourSegNet import YourSegNet
+from src.utils.utils import mean_dice, convert_mask_to_rgb_image
 import matplotlib.pyplot as plt
 
 
 class CNNTrainTestManager(object):
     """
-    Class used the train and test the given model in the parameters 
+    Class used the train and test the given model in the parameters
     """
 
     def __init__(self, model,
@@ -33,7 +34,8 @@ class CNNTrainTestManager(object):
                  optimizer_factory: Callable[[torch.nn.Module], torch.optim.Optimizer],
                  batch_size=1,
                  validation=None,
-                 use_cuda=False):
+                 use_cuda=False,
+                 checkpoint_dir='checkpoints'):
         """
         Args:
             model: model to train
@@ -44,8 +46,8 @@ class CNNTrainTestManager(object):
             below for more details
             validation: wether to use custom validation data or let the one by default
             use_cuda: to Use the gpu to train the model
+            checkpoint_dir: directory to save model checkpoints
         """
-
         device_name = 'cuda:0' if use_cuda else 'cpu'
         if use_cuda and not torch.cuda.is_available():
             warnings.warn("CUDA is not available. Suppress this warning by passing "
@@ -60,12 +62,123 @@ class CNNTrainTestManager(object):
             self.data_manager = DataManager(trainset, testset, batch_size=batch_size)
         self.loss_fn = loss_fn
         self.model = model
-        self.optimizer = optimizer_factory(self.model)
+
+        # Transférer le modèle et la fonction de perte vers le GPU si disponible
         self.model = self.model.to(self.device)
+        if hasattr(self.loss_fn, 'to'):
+            self.loss_fn = self.loss_fn.to(self.device)
+
+        self.optimizer = optimizer_factory(self.model)
         self.use_cuda = use_cuda
         self.metric_values = {}
 
-        self.best_validation_accuracy = 0
+        # Initialisation du checkpointing
+        self.checkpoint_dir = checkpoint_dir
+        self.best_val_acc = 0.0
+        os.makedirs(checkpoint_dir, exist_ok=True)
+
+        # Afficher la taille du modèle (nombre de paramètres)
+        total_params = sum(p.numel() for p in self.model.parameters())
+        trainable_params = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
+        print(f"Total des paramètres: {total_params:,}")
+        print(f"Paramètres entraînables: {trainable_params:,}")
+
+    def save_checkpoint(self, epoch, is_best=False):
+        """
+        Sauvegarde un checkpoint du modèle
+        Args:
+            epoch: numéro de l'époque actuelle
+            is_best: si True, sauvegarde comme meilleur modèle
+        """
+        checkpoint = {
+            'epoch': epoch,
+            'model_state_dict': self.model.state_dict(),
+            'optimizer_state_dict': self.optimizer.state_dict(),
+            'val_acc': self.metric_values['val_acc'][-1],
+            'train_acc': self.metric_values['train_acc'][-1],
+            'val_loss': self.metric_values['val_loss'][-1],
+            'train_loss': self.metric_values['train_loss'][-1],
+            'device': str(self.device)
+        }
+
+        model_name = self.model.__class__.__name__
+
+        # Sauvegarde du checkpoint de l'époque
+        torch.save(checkpoint, os.path.join(self.checkpoint_dir, f'checkpoint_epoch_{epoch}_{model_name}.pth'))
+
+        # Si c'est le meilleur modèle, on le sauvegarde séparément
+        if is_best:
+            torch.save(checkpoint, os.path.join(self.checkpoint_dir, f'best_model_{model_name}.pth'))
+            print(
+                f'Nouveau meilleur modèle sauvegardé avec une précision de validation de {self.metric_values["val_acc"][-1]:.3f}')
+
+    def load_checkpoint(self, checkpoint_path):
+        """
+        Charge un checkpoint du modèle
+        Args:
+            checkpoint_path: chemin vers le fichier de checkpoint
+        """
+        # Assurer le chargement sur le bon dispositif
+        map_location = self.device
+        checkpoint = torch.load(checkpoint_path, map_location=map_location)
+        self.model.load_state_dict(checkpoint['model_state_dict'])
+        self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+
+        # Si le checkpoint a été sauvegardé sur GPU mais chargé sur CPU, ajuster les états de l'optimiseur
+        if 'device' in checkpoint and checkpoint['device'] != str(self.device):
+            for state in self.optimizer.state.values():
+                for k, v in state.items():
+                    if isinstance(v, torch.Tensor):
+                        state[k] = v.to(self.device)
+
+        print(f"Checkpoint chargé depuis l'époque {checkpoint['epoch']}")
+        return checkpoint['epoch']
+
+    def evaluate_on_validation_set(self):
+        """
+        function that evaluate the model on the validation set every epoch
+        """
+        # switch to eval mode so that layers like batchnorm's layers nor dropout's layers
+        # works in eval mode instead of training mode
+        self.model.eval()
+
+        # Get validation data
+        val_loader = self.data_manager.get_validation_set()
+        validation_loss = 0.0
+        validation_losses = []
+        validation_accuracies = []
+
+        with torch.no_grad():
+            for j, val_data in enumerate(val_loader, 0):
+                # transfer tensors to the selected device
+                val_inputs, val_labels = val_data[0].to(self.device), val_data[1].to(self.device)
+
+                # forward pass
+                val_outputs = self.model(val_inputs)
+
+                # compute loss function
+                loss = self.loss_fn(val_outputs, val_labels)
+                validation_losses.append(loss.item())
+                validation_accuracies.append(self.accuracy(val_outputs, val_labels))
+                validation_loss += loss.item()
+
+        self.metric_values['val_loss'].append(np.mean(validation_losses))
+        self.metric_values['val_acc'].append(np.mean(validation_accuracies))
+
+        # Vérifie si c'est le meilleur modèle
+        current_val_acc = np.mean(validation_accuracies)
+        is_best = current_val_acc > self.best_val_acc
+        if is_best:
+            self.best_val_acc = current_val_acc
+
+        # displays metrics
+        print('Validation loss %.3f' % (validation_loss / len(val_loader)))
+        print('Validation accuracy %.3f' % (np.mean(validation_accuracies)))
+
+        # switch back to train mode
+        self.model.train()
+
+        return is_best
 
     def train(self, num_epochs):
         """
@@ -123,57 +236,19 @@ class CNNTrainTestManager(object):
                     # print metrics along progress bar
                     train_loss += loss.item()
                     train_acc += acc
-                    #t.set_postfix({loss='{:05.3f}'.format(train_loss / (i + 1))})
-                    t.set_postfix({'Train loss': train_loss / (i + 1), "train_acc":  train_acc / (i + 1)})
+                    # t.set_postfix({loss='{:05.3f}'.format(train_loss / (i + 1))})
+                    t.set_postfix({'Train loss': train_loss / (i + 1), "train_acc": train_acc / (i + 1)})
                     t.update()
+
             # evaluate the model on validation data after each epoch
             self.metric_values['train_loss'].append(np.mean(train_losses))
             self.metric_values['train_acc'].append(np.mean(train_accuracies))
-            self.evaluate_on_validation_set()
+            is_best = self.evaluate_on_validation_set()
+
+            # Sauvegarde du checkpoint
+            self.save_checkpoint(epoch, is_best)
 
         print("Finished training.")
-
-    def evaluate_on_validation_set(self):
-        """
-        function that evaluate the model on the validation set every epoch
-        """
-        # switch to eval mode so that layers like batchnorm's layers nor dropout's layers
-        # works in eval mode instead of training mode
-        self.model.eval()
-
-        # Get validation data
-        val_loader = self.data_manager.get_validation_set()
-        validation_loss = 0.0
-        validation_losses = []
-        validation_accuracies = []
-
-        with torch.no_grad():
-            for j, val_data in enumerate(val_loader, 0):
-                # transfer tensors to the selected device
-                val_inputs, val_labels = val_data[0].to(self.device), val_data[1].to(self.device)
-
-                # forward pass
-                val_outputs = self.model(val_inputs)
-
-                # compute loss function
-                loss = self.loss_fn(val_outputs, val_labels)
-                validation_losses.append(loss.item())
-                validation_accuracies.append(self.accuracy(val_outputs, val_labels))
-                validation_loss += loss.item()
-
-        self.metric_values['val_loss'].append(np.mean(validation_losses))
-        self.metric_values['val_acc'].append(np.mean(validation_accuracies))
-
-        # displays metrics
-        print('Validation loss %.3f' % (validation_loss / len(val_loader)))
-        print('Validation accuracy %.3f' % (np.mean(validation_accuracies)))
-
-        if self.best_validation_accuracy < np.mean(validation_accuracies):
-            torch.save(self.model.state_dict(), "best_model.pth")
-            self.best_validation_accuracy = np.mean(validation_accuracies)
-
-        # switch back to train mode
-        self.model.train()
 
     def accuracy(self, outputs, labels):
         """
@@ -232,8 +307,15 @@ class CNNTrainTestManager(object):
         ax2.set_xlabel('Epochs')
         ax2.set_ylabel('accuracy')
         ax2.legend()
-        model_name = self.model.__class__.__name__
-        f.savefig(f"{model_name}_fig1.png")
+        # f.savefig('fig1.png')
+
+        # Save figure with model-specific name
+        model_name = self.model.__class__.__name__  # os.path.basename(self.checkpoint_dir)
+        figures_dir = 'figures'
+        os.makedirs(figures_dir, exist_ok=True)
+        fig_path = os.path.join(figures_dir, f'{model_name}_metrics.png')
+        f.savefig(fig_path)
+        print(f'Métriques sauvegardées dans: {fig_path}')
 
         plt.show()
 
@@ -298,12 +380,185 @@ class CNNTrainTestManager(object):
             ax4.imshow(prediction.astype('uint8'))
             ax4.set_title('predicted segmentation')
             ax4.axis('off')
+            # # Save as a png image
+            # f.savefig('fig{}.png'.format(it+1))
 
-            # Save as a png image
-            f.savefig('fig{}.png'.format(it+1))
+            # Save as a png image with model-specific name
+            model_name = self.model.__class__.__name__  # os.path.basename(self.checkpoint_dir)
+            figures_dir = 'figures'
+            os.makedirs(figures_dir, exist_ok=True)
+            fig_path = os.path.join(figures_dir, f'{model_name}_prediction_{it}.png')
+            f.savefig(fig_path)
+            print(f'Prédiction sauvegardée dans: {fig_path}')
+
             # show image
             plt.show()
 
+    def visualize_data_augmentation(self, num_samples=3):
+        """
+        Visualise les effets de l'augmentation de données sur quelques images et leurs masques
+        Args:
+            num_samples: nombre d'échantillons à visualiser
+        """
+        import matplotlib.pyplot as plt
+        import random
+        import torch
+        import numpy as np
+        from src.utils.utils import convert_mask_to_rgb_image
+        from src.utils.data_augmentation import ACDCJointTransform
+
+        # Obtenir le jeu de données d'entraînement
+        train_loader = self.data_manager.get_train_set()
+
+        # Vérifier si l'ensemble d'entraînement est vide
+        if len(train_loader) == 0:
+            print("ATTENTION: L'ensemble d'entraînement est vide! Impossible de visualiser l'augmentation de données.")
+            return
+
+        # Obtenir le nombre réel d'échantillons disponibles
+        num_available_samples = min(len(train_loader), num_samples)
+        if num_available_samples < num_samples:
+            print(
+                f"ATTENTION: Seulement {num_available_samples} échantillons disponibles au lieu de {num_samples} demandés.")
+
+        # Créer les transformations d'augmentation pour la démonstration
+        # Utiliser les nouvelles transformations
+        rotation_transform = ACDCJointTransform(rotation=True, elastic=False, rotation_degrees=60)
+        elastic_transform = ACDCJointTransform(rotation=False, elastic=True, elastic_alpha=50.0, elastic_sigma=5.0)
+
+        # Obtenir quelques échantillons du jeu de données
+        samples = []
+        for i, data in enumerate(train_loader):
+            if i >= num_available_samples:
+                break
+            samples.append(data)
+
+        # Pour chaque échantillon, appliquer les transformations et afficher les résultats
+        for i, (inputs, labels) in enumerate(samples):
+            try:
+                # Déplacer les tenseurs vers le CPU pour traitement
+                input_img = inputs[0].cpu().numpy()
+                label_img = labels[0].cpu().numpy()
+
+                # Debug - afficher les dimensions
+                print(f"input_img shape: {input_img.shape}")
+                print(f"label_img shape: {label_img.shape}")
+
+                # Supprimer la dimension de canal pour l'image d'entrée si présente
+                if len(input_img.shape) == 3 and input_img.shape[0] == 1:
+                    input_img = input_img.squeeze(0)
+
+                # Sauvegarder la graine pour assurer la même transformation sur l'image et le masque
+                seed = 42 + i
+                random.seed(seed)
+                np.random.seed(seed)
+                torch.manual_seed(seed)
+
+                # Créer un masque one-hot pour la visualisation
+                if len(label_img.shape) == 2:  # Si le masque est déjà en format catégorique
+                    max_class = int(np.max(label_img)) + 1
+                    label_one_hot = np.zeros((input_img.shape[0], input_img.shape[1], max_class))
+                    for c in range(max_class):  # Pour chaque classe
+                        label_one_hot[:, :, c] = (label_img == c).astype(np.float32)
+                else:
+                    max_class = 4  # Par défaut pour ACDC
+                    label_one_hot = np.zeros((input_img.shape[0], input_img.shape[1], max_class))
+                    for c in range(max_class):  # Pour chaque classe
+                        label_one_hot[:, :, c] = (label_img == c).astype(np.float32)
+
+                # Transformer l'image d'entrée et les étiquettes avec rotation
+                random.seed(seed)
+                np.random.seed(seed)
+                torch.manual_seed(seed)
+                rotated_input = rotation_transform(input_img).numpy() if isinstance(rotation_transform(input_img),
+                                                                                    torch.Tensor) else rotation_transform(
+                    input_img)
+
+                # Pour la rotation du masque
+                rotated_label = np.zeros_like(label_img)
+                for c in range(max_class):
+                    mask = (label_img == c).astype(np.float32)
+                    random.seed(seed)
+                    np.random.seed(seed)
+                    torch.manual_seed(seed)
+                    rotated_mask = rotation_transform(mask).numpy() if isinstance(rotation_transform(mask),
+                                                                                  torch.Tensor) else rotation_transform(
+                        mask)
+                    rotated_label[rotated_mask > 0.5] = c
+
+                # Appliquer la déformation élastique
+                seed = 73 + i
+                random.seed(seed)
+                np.random.seed(seed)
+                torch.manual_seed(seed)
+                elastic_input = elastic_transform(input_img).numpy() if isinstance(elastic_transform(input_img),
+                                                                                   torch.Tensor) else elastic_transform(
+                    input_img)
+
+                elastic_label = np.zeros_like(label_img)
+                for c in range(max_class):
+                    mask = (label_img == c).astype(np.float32)
+                    random.seed(seed)
+                    np.random.seed(seed)
+                    torch.manual_seed(seed)
+                    elastic_mask = elastic_transform(mask).numpy() if isinstance(elastic_transform(mask),
+                                                                                 torch.Tensor) else elastic_transform(
+                        mask)
+                    elastic_label[elastic_mask > 0.5] = c
+
+                # Convertir les masques en images RGB pour l'affichage
+                original_label_rgb = convert_mask_to_rgb_image(label_img)
+                rotated_label_rgb = convert_mask_to_rgb_image(rotated_label)
+                elastic_label_rgb = convert_mask_to_rgb_image(elastic_label)
+
+                # Créer la figure pour afficher les résultats
+                fig, axs = plt.subplots(2, 3, figsize=(15, 10))
+
+                # Afficher les images originales et transformées
+                axs[0, 0].imshow(input_img, cmap='gray')
+                axs[0, 0].set_title('Image originale')
+                axs[0, 0].axis('off')
+
+                axs[0, 1].imshow(rotated_input, cmap='gray')
+                axs[0, 1].set_title('Image avec rotation')
+                axs[0, 1].axis('off')
+
+                axs[0, 2].imshow(elastic_input, cmap='gray')
+                axs[0, 2].set_title('Image avec déformation élastique')
+                axs[0, 2].axis('off')
+
+                # Afficher les masques originaux et transformés
+                axs[1, 0].imshow(original_label_rgb)
+                axs[1, 0].set_title('Masque original')
+                axs[1, 0].axis('off')
+
+                axs[1, 1].imshow(rotated_label_rgb)
+                axs[1, 1].set_title('Masque avec rotation')
+                axs[1, 1].axis('off')
+
+                axs[1, 2].imshow(elastic_label_rgb)
+                axs[1, 2].set_title('Masque avec déformation élastique')
+                axs[1, 2].axis('off')
+
+                plt.tight_layout()
+
+                # Créer le répertoire pour sauvegarder les figures s'il n'existe pas
+                figures_dir = 'figures'
+                os.makedirs(figures_dir, exist_ok=True)
+
+                # Sauvegarder la figure
+                fig_path = os.path.join(figures_dir, f'augmentation_example_{i + 1}.png')
+                plt.savefig(fig_path)
+                print(f"Image d'exemple d'augmentation sauvegardée sous {fig_path}")
+
+                plt.close(fig)
+
+            except Exception as e:
+                print(f"Erreur lors de la visualisation de l'échantillon {i}: {str(e)}")
+                continue
+
+        print(f"Visualisation de l'augmentation de données terminée.")
+        print(f"Les images d'exemple ont été sauvegardées dans le répertoire 'figures/'.")
 
 def optimizer_setup(optimizer_class: Type[torch.optim.Optimizer], **hyperparameters) -> \
         Callable[[torch.nn.Module], torch.optim.Optimizer]:
