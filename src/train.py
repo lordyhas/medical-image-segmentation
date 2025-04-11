@@ -105,15 +105,11 @@ if __name__ == "__main__":
     ])
 
     transform = base_transform
-<<<<<<< src/train.py
 
-=======
     if data_augment == 1:
         transform = transforms.Compose([data_augment_transform1, transform])
     elif data_augment == 2:
         transform = transforms.Compose([data_augment_transform2, transform])
-
->>>>>>> src/train.py
 
     if args.dataset == 'cifar10':
         # Download the train and test set and apply transform on it
