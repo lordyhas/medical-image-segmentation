@@ -98,6 +98,18 @@ if __name__ == "__main__":
         transforms.ToTensor(),
         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
         ]
+    )
+    data_augment_transform3 = transforms.Compose(
+        [
+        transforms.RandomCrop(32, padding=4),
+        transforms.RandomAffine(10),
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomVerticalFlip(),
+        transforms.RandomRotation(degrees=15),
+        transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2),
+        transforms.ToTensor(),
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+        ]
     ) 
     base_transform = transforms.Compose([
         transforms.ToTensor(),
@@ -110,7 +122,9 @@ if __name__ == "__main__":
     elif data_augment == 2:
         print("Data augmentation 2")
         transform = transforms.Compose([data_augment_transform2, transform])
-
+    elif data_augment == 3:
+        print("Data augmentation 3")
+        transform = transforms.Compose([data_augment_transform3, transform])
 
     if args.dataset == 'cifar10':
         # Download the train and test set and apply transform on it
