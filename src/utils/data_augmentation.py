@@ -24,7 +24,7 @@ class ACDCJointTransform:
         elastic (bool): Activer la déformation élastique
         rotation_degrees (float): Angle maximal de rotation (+ et -)
         elastic_alpha (float): Amplitude de la déformation élastique
-        elastic_sigma (float): Lissage de la déformation élastique
+        elastic_sigma (float): Lissage de la déformation élastique.
     """
 
     def __init__(self, rotation=False, elastic=False, rotation_degrees=60,

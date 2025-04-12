@@ -9,7 +9,7 @@ from src.models.CNNBaseModel import CNNBaseModel
 TODO
 
 Ajouter du code ici pour faire fonctionner le réseau YourUNet.  Un réseau inspiré de UNet
-mais comprenant des connexions résiduelles et denses.  Soyez originaux et surtout... amusez-vous!
+mais comprenant des connexions résiduelles et denses.  Soyez originaux et surtout... amusez-vous
 
 '''
 

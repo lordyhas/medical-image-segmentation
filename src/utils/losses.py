@@ -13,7 +13,7 @@ class DiceLoss(nn.Module):
         self.smooth = smooth
 
     def forward(self, predictions, targets):
-        # S'assurer que les prédictions ont la bonne forme
+        # S'assurer que les prédictions ont la bonne forme.
         if len(predictions.shape) == 4:
             # Assurer que les cibles sont des entiers valides dans la plage [0, num_classes-1]
             num_classes = predictions.size(1)

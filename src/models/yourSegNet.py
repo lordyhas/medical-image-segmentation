@@ -30,7 +30,7 @@ class YourSegNet(CNNBaseModel):
         Builds YourSegNet model.
         Args:
             num_classes(int): number of classes. default 10(cifar10 or svhn)
-            init_weights(bool): when true uses _initialize_weights function to initialize
+            init_weights(bool): when true uses _initialize_weights function to initialize.
             network's weights.
         """
         super().__init__(num_classes, init_weights)
@@ -165,7 +165,6 @@ class YourSegNet(CNNBaseModel):
             nn.Conv2d(mid_channels * 2, out_channels, 1),  # Ajustement au nombre de canaux de sortie souhaité
             nn.ReLU()
         )
-
 
 '''
 Fin de votre code.
