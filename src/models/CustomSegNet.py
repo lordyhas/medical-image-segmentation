@@ -1,22 +1,24 @@
 # -*- coding:utf-8 -*-
 
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from src.models.CNNBaseModel import CNNBaseModel
-from src.models.CNNBlocks import ResidualBlock, DenseBlock, BottleneckBlock
-# Author : Hassan Kajila
-'''
-Improved YourSegNet network with:
+"""
+Author: Hassan Kajila
+
+CustomSegNet: asymmetric encoder-decoder segmentation network with:
 - Residual blocks
 - Dense blocks
 - Bottleneck blocks
 - Dilated (atrous) convolutions
 - Asymmetric skip connections
-'''
+"""
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from src.models.CNNBaseModel import CNNBaseModel
+from src.models.CNNBlocks import ResidualBlock, DenseBlock
 
 
-class YourSegNet(CNNBaseModel):
+class CustomSegNet(CNNBaseModel):
     """
     Asymmetric architecture inspired by DeepLabV3 with:
     - Deep encoder with atrous convolutions and residual blocks
@@ -27,9 +29,9 @@ class YourSegNet(CNNBaseModel):
 
     def __init__(self, num_classes=4, init_weights=True):
         """
-        Builds YourSegNet model.
+        Builds CustomSegNet model.
         Args:
-            num_classes(int): number of classes. default 10(cifar10 or svhn)
+            num_classes(int): number of segmentation classes. default 4 (ACDC)
             init_weights(bool): when true uses _initialize_weights function to initialize
             network's weights.
         """

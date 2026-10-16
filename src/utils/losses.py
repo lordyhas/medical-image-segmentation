@@ -1,12 +1,19 @@
+# -*- coding:utf-8 -*-
+
+"""
+Author: Hassan Kajila
+
+Segmentation losses: Dice + cross-entropy and Focal loss.
+"""
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-# Author: Hassan Kajila
 
 class DiceLoss(nn.Module):
     """
-    Dice loss function for YourUNet.
+    Dice loss for multi-class segmentation.
     Combines Dice loss with cross-entropy loss for better stability.
     """
 
@@ -54,7 +61,7 @@ class DiceLoss(nn.Module):
 
 class FocalLoss(nn.Module):
     """
-    Focal loss function for YourSegNet.
+    Focal loss for multi-class segmentation.
     Useful for handling class imbalance.
     """
 

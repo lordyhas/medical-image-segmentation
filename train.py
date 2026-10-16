@@ -3,7 +3,6 @@
 
 """
 University of Sherbrooke
-Date:
 Authors: Hassan Kajila & Pierre-Marc Jodoin
 License: Opensource, free to use
 Other: Suggestions are welcome
@@ -19,15 +18,13 @@ import numpy as np
 import os
 import time
 # Import models and utilities
-# from src.utils.preprocess import get_data_loader, get_data_loader_svhn
-# from src.utils.utils import optimizer_setup, create_figure
 from src.models.CNNVanilla import CnnVanilla
 from src.models.AlexNet import AlexNet
 from src.models.VggNet import VggNet
 from src.models.ResNet import ResNet
 from src.models.UNet import UNet
-from src.models.yourUNet import YourUNet
-from src.models.yourSegNet import YourSegNet
+from src.models.CustomUNet import CustomUNet
+from src.models.CustomSegNet import CustomSegNet
 from src.manage.HDF5Dataset import HDF5Dataset
 from src.manage.DataManager import DataManager
 from src.manage.CNNTrainTestManager import CNNTrainTestManager, optimizer_setup
@@ -62,7 +59,7 @@ def argument_parser():
                                                  "on acdc dataset.",
                                      add_help=True)
     parser.add_argument('--model', type=str, default="CnnVanilla",
-                        choices=["CnnVanilla", "VggNet", "AlexNet", "ResNet", "YourUNet", "YourSegNet", "UNet"])
+                        choices=["CnnVanilla", "VggNet", "AlexNet", "ResNet", "CustomUNet", "CustomSegNet", "UNet"])
     parser.add_argument('--dataset', type=str, default="cifar10", choices=["cifar10", "svhn", "acdc"])
     parser.add_argument('--loss', type=str, default="CE", choices=["CE", "Dice", "Focal"],
                         help="Loss function to use (CE: Cross Entropy, Dice: Dice Loss, Focal: Focal Loss)")
@@ -83,7 +80,7 @@ def argument_parser():
     parser.add_argument('--elastic', action='store_true',
                         help="Activate elastic deformation for data augmentation")
     parser.add_argument('--flip_crop', action='store_true',
-                        help="Activate elastic deformation for data augmentation")
+                        help="Activate random crop, flip and affine transforms for data augmentation")
     parser.add_argument('--predict', type=str,
                         help="Name of the file containing model weights used to make "
                              "segmentation prediction on test data")
@@ -233,8 +230,8 @@ if __name__ == "__main__":
         model = VggNet(num_classes=10)
     elif args.model == 'ResNet':
         model = ResNet(num_classes=10)
-    elif args.model == 'YourUNet':
-        model = YourUNet(num_classes=4)
+    elif args.model == 'CustomUNet':
+        model = CustomUNet(num_classes=4)
         args.dataset = 'acdc'
         # Create the dataset with augmentation settings
         train_set = HDF5Dataset('train', acdc_hdf5_file, transform=acdc_base_transform)
@@ -242,8 +239,8 @@ if __name__ == "__main__":
         if args.max_samples is not None:
             print(f"Using {args.max_samples} samples for training")
             train_set = torch.utils.data.Subset(train_set, range(min(args.max_samples, len(train_set))))
-    elif args.model == 'YourSegNet':
-        model = YourSegNet(num_classes=4)
+    elif args.model == 'CustomSegNet':
+        model = CustomSegNet(num_classes=4)
         args.dataset = 'acdc'
         # Create the dataset with augmentation settings
         train_set = HDF5Dataset('train', acdc_hdf5_file, transform=acdc_base_transform)

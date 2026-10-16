@@ -1,13 +1,17 @@
 # -*- coding:utf-8 -*-
 
+"""
+Author: Hassan Kajila
+
+CustomUNet: UNet variant built on depthwise-separable convolutions.
+"""
 
 import torch
 import torch.nn as nn
 from src.models.CNNBaseModel import CNNBaseModel
 
-# Authors: Hassan Kajila
 
-class YourUNet(CNNBaseModel):
+class CustomUNet(CNNBaseModel):
     """
     Improved UNet version with:
     - Separable convolutions
@@ -17,9 +21,9 @@ class YourUNet(CNNBaseModel):
 
     def __init__(self, num_classes=4, init_weights=True):
         """
-        Builds yourUNet model.
+        Builds CustomUNet model.
         Args:
-            num_classes(int): number of classes. default 10(cifar10 or svhn)
+            num_classes(int): number of segmentation classes. default 4 (ACDC)
             init_weights(bool): when true uses _initialize_weights function to initialize
             network's weights.
         """
@@ -94,10 +98,10 @@ class YourUNet(CNNBaseModel):
         Residual block with separable convolutions
         """
         return nn.Sequential(
-            YourUNet._separable_conv(in_channels, out_channels),
+            CustomUNet._separable_conv(in_channels, out_channels),
             nn.ReLU(),
             nn.BatchNorm2d(out_channels),
-            YourUNet._separable_conv(out_channels, out_channels),
+            CustomUNet._separable_conv(out_channels, out_channels),
             nn.ReLU(),
             nn.BatchNorm2d(out_channels)
         )
@@ -108,8 +112,8 @@ class YourUNet(CNNBaseModel):
         Convolution block with residual connections
         """
         return nn.Sequential(
-            YourUNet._residual_block(in_channels, out_channels),
-            YourUNet._residual_block(out_channels, out_channels)
+            CustomUNet._residual_block(in_channels, out_channels),
+            CustomUNet._residual_block(out_channels, out_channels)
         )
 
     @staticmethod
@@ -119,8 +123,8 @@ class YourUNet(CNNBaseModel):
         """
         return nn.Sequential(
             nn.MaxPool2d(kernel_size=2),
-            YourUNet._residual_block(in_channels, out_channels),
-            YourUNet._residual_block(out_channels, out_channels)
+            CustomUNet._residual_block(in_channels, out_channels),
+            CustomUNet._residual_block(out_channels, out_channels)
         )
 
     @staticmethod
@@ -132,7 +136,7 @@ class YourUNet(CNNBaseModel):
             nn.Conv2d(in_channels, out_channels // 2, 1),
             nn.ReLU(),
             nn.BatchNorm2d(out_channels // 2),
-            YourUNet._separable_conv(out_channels // 2, out_channels),
+            CustomUNet._separable_conv(out_channels // 2, out_channels),
             nn.ReLU(),
             nn.BatchNorm2d(out_channels)
         )
@@ -143,7 +147,7 @@ class YourUNet(CNNBaseModel):
         Expansion block with separable convolutions
         """
         return nn.Sequential(
-            YourUNet._residual_block(in_channels, out_channels),
+            CustomUNet._residual_block(in_channels, out_channels),
             nn.ConvTranspose2d(out_channels, out_channels, kernel_size=3, stride=2, padding=1, output_padding=1)
         )
 
@@ -153,7 +157,7 @@ class YourUNet(CNNBaseModel):
         Final block with separable convolutions
         """
         return nn.Sequential(
-            YourUNet._residual_block(in_channels, mid_channels),
+            CustomUNet._residual_block(in_channels, mid_channels),
             nn.Conv2d(mid_channels, out_channels, 1)
         )
 

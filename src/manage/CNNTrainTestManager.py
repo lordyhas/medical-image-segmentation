@@ -2,9 +2,7 @@
 
 """
 University of Sherbrooke
-Date:
 Authors: Hassan Kajila & Pierre-Marc Jodoin
-License:
 Other: Suggestions are welcome
 """
 
@@ -16,8 +14,8 @@ from src.manage.DataManager import DataManager
 from typing import Callable, Type
 from tqdm import tqdm
 from src.models.UNet import UNet
-from src.models.yourUNet import YourUNet
-from src.models.yourSegNet import YourSegNet
+from src.models.CustomUNet import CustomUNet
+from src.models.CustomSegNet import CustomSegNet
 from src.utils.utils import mean_dice, convert_mask_to_rgb_image
 import matplotlib.pyplot as plt
 
@@ -259,7 +257,7 @@ class CNNTrainTestManager(object):
         Returns:
             Accuracy of the model
         """
-        if isinstance(self.model, UNet) or isinstance(self.model, YourSegNet) or isinstance(self.model, YourUNet):
+        if isinstance(self.model, UNet) or isinstance(self.model, CustomSegNet) or isinstance(self.model, CustomUNet):
             # Compute the mean Dice score across the classes
             return mean_dice(outputs, labels).item()
         else:

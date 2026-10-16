@@ -2,9 +2,7 @@
 
 """
 University of Sherbrooke
-Date:
 Authors: Hassan Kajila & Pierre-Marc Jodoin
-License:
 Other: Suggestions are welcome
 """
 

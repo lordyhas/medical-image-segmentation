@@ -3,9 +3,7 @@
 
 """
 University of Sherbrooke
-Date:
 Authors: Hassan Kajila & Pierre-Marc Jodoin
-License:
 Other: Suggestions are welcome
 """
 
@@ -25,12 +23,12 @@ class HDF5Dataset(data.Dataset):
     def __init__(self, set, file_path, input_size: int = 256, transform=None, num_classes=4, pin_memory=True):
         """
         Args:
-            set: ensemble de données ('train', 'test', etc.)
-            file_path: chemin vers le fichier HDF5
-            input_size: taille des images d'entrée
-            transform: transformations à appliquer
-            num_classes: nombre de classes
-            pin_memory: si True, essaie de garder les données en mémoire CPU épinglée pour accélérer le transfert vers GPU
+            set: dataset split ('train', 'test', etc.)
+            file_path: path to the HDF5 file
+            input_size: size of the input images
+            transform: transformations to apply
+            num_classes: number of classes
+            pin_memory: if True, keeps the data in pinned CPU memory to speed up transfers to the GPU
         """
         self.file_path = file_path
         self.set = set
@@ -40,14 +38,14 @@ class HDF5Dataset(data.Dataset):
         self.pin_memory = pin_memory
         self.data = self._load_data()
 
-        # Pré-chargement des informations clés
+        # Preload the patient keys
         with h5py.File(self.file_path, 'r') as f:
             self.key_list = list(f[self.set].keys())
 
-        # Vérifier si CUDA est disponible pour les optimisations GPU
+        # Check whether CUDA is available for GPU optimizations
         self.use_cuda = torch.cuda.is_available()
         if self.use_cuda:
-            # Pour le DataLoader de PyTorch, optimiser les transferts CPU->GPU
+            # Let cuDNN pick the fastest convolution algorithms
             torch.backends.cudnn.benchmark = True
 
     def _load_data(self):
@@ -113,24 +111,24 @@ class HDF5Dataset(data.Dataset):
             random.seed(seed)
             gt_slice = self.transform(gt_slice)
         else:
-            # Convertir en tenseurs PyTorch
+            # Convert to PyTorch tensors
             img_slice = torch.from_numpy(img_slice).float()
             gt_slice = torch.from_numpy(gt_slice).float()
 
         # ground truth must be encoded in categorical form instead of one_hot vector
         # in order to allow pytorch's CrossEntropy to compute the loss
-        # Assurons-nous que les étiquettes sont toujours dans la plage valide [0, num_classes-1]
+        # Make sure the labels always stay in the valid range [0, num_classes - 1]
         if isinstance(gt_slice, torch.Tensor):
             gt_categorical = torch.argmax(gt_slice, dim=0)
-            # Remplacer les valeurs en dehors de la plage par 0 (fond)
+            # Clamp out-of-range values
             gt_categorical = torch.clamp(gt_categorical, 0, self.num_classes - 1)
         else:
             gt_categorical = np.argmax(gt_slice, axis=0)
-            # Remplacer les valeurs en dehors de la plage par 0 (fond)
+            # Clamp out-of-range values
             gt_categorical = np.clip(gt_categorical, 0, self.num_classes - 1)
             gt_categorical = torch.from_numpy(gt_categorical).long()
 
-        # Optimisation pour le transfert vers GPU
+        # Speed up the transfer to the GPU
         if self.pin_memory and self.use_cuda:
             img_slice = img_slice.pin_memory()
             gt_categorical = gt_categorical.pin_memory()
@@ -139,14 +137,14 @@ class HDF5Dataset(data.Dataset):
 
     def __len__(self):
         """
-        return the length of the dadaist
+        return the length of the dataset
         """
         return int(np.floor(len(self.data)))
 
     @staticmethod
     def get_data_slice(key, position, file):
         """
-        Return one slice from the hdf3 file
+        Return one slice from the hdf5 file
         Args:
             key: key corresponding to each patient
             position: image and ground truth positions into patient's images
