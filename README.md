@@ -1,206 +1,201 @@
-# IFT 780 - Devoir 4 - Segmentation d'images IRM cardiaques
+# Cardiac MRI Image Segmentation
 
-Ce projet implémente des réseaux de neurones pour la segmentation d'images IRM cardiaques en quatre classes :
-1. Fond
-2. Ventricule droit
-3. Myocarde
-4. Ventricule gauche
+This project implements neural networks for the segmentation of cardiac MRI images into four classes:
+1. Background
+2. Right ventricle
+3. Myocardium
+4. Left ventricle
 
-## Fichiers modifiés
+## Modified files
 
 ### Question 1 - Architectures
 
 1. `src/models/YourUNet.py`
-   - Nouvelle architecture basée sur UNet avec :
-     - Convolutions séparables
-     - Couches résiduelles
-     - Blocs bottleneck
+   - New UNet-based architecture with:
+     - Separable convolutions
+     - Residual layers
+     - Bottleneck blocks
 
 2. `src/models/YourSegNet.py`
-   - Architecture non-symétrique inspirée de DeepLabV3 avec :
-     - Encoder profond avec atrous convolutions et blocs résiduels
-     - Decoder léger avec upsampling progressif et blocs denses
-     - Skip connections asymétriques améliorées
-     - Blocs bottleneck pour réduire les paramètres
-     - Blocs résiduels pour faciliter l'apprentissage profond
-     - Blocs denses pour une meilleure fusion des caractéristiques
-     - Convolutions dilatées (atrous) pour capturer les contextes multi-échelles
-     - Mécanisme de fusion optimisé pour les skip connections
+   - Asymmetric architecture inspired by DeepLabV3 with:
+     - Deep encoder with atrous convolutions and residual blocks
+     - Lightweight decoder with progressive upsampling and dense blocks
+     - Improved asymmetric skip connections
+     - Bottleneck blocks to reduce parameters
+     - Residual blocks to facilitate deep learning
+     - Dense blocks for better feature fusion
+     - Dilated (atrous) convolutions to capture multi-scale context
+     - Optimized fusion mechanism for skip connections
 
 3. `src/utils/losses.py`
-   - Nouvelles fonctions de perte :
-     - `DiceLoss` : Combine la perte Dice avec l'entropie croisée
-     - `FocalLoss` : Gestion du déséquilibre des classes
+   - New loss functions:
+     - `DiceLoss`: Combines Dice loss with cross-entropy
+     - `FocalLoss`: Handles class imbalance
 
 4. `/train.py`
-   - Ajout des nouveaux modèles dans les options
-   - Intégration des nouvelles fonctions de perte
-   - Support du dataset ACDC
+   - Added new models to the options
+   - Integrated the new loss functions
+   - Added ACDC dataset support
 
 ### Question 2 - Checkpointing
 
 1. `src/manage/CNNTrainTestManager.py`
-   - Ajout du système de checkpointing
-   - Sauvegarde automatique du meilleur modèle
-   - Sauvegarde des checkpoints à chaque époque
-   - Possibilité de charger un checkpoint existant
+   - Added checkpointing system
+   - Automatic saving of the best model
+   - Saving checkpoints at every epoch
+   - Ability to load an existing checkpoint
 
-### Question 3 - Augmentation de données
+### Question 3 - Data Augmentation
 
 1. `src/utils/augmentation.py`
-   - Implémentation d'une classe d'augmentation avancée `ACDCJointTransform`
-   - Utilise les transformations standard de torchvision
-   - Gère la cohérence entre images et masques
-   - Paramètres améliorés (rotation jusqu'à 60°, déformation plus marquée)
+   - Implementation of the advanced augmentation class `ACDCJointTransform`
+   - Uses standard torchvision transformations
+   - Maintains consistency between images and masks
+   - Improved parameters (rotation up to 60°, stronger deformation)
 
 2. `train.py`
-   - Intégration de la nouvelle classe d'augmentation
-   - Migration des transformations personnalisées vers les standards torchvision
-   - Amélioration des paramètres pour des effets plus visibles
+   - Integrated the new augmentation class
+   - Migrated custom transforms to standard torchvision transforms
+   - Improved parameters for more visible effects
 
 3. `src/manage/CNNTrainTestManager.py`
-   - Implémentation de la méthode `visualize_data_augmentation` pour visualiser les effets des augmentations
-   - Mise à jour pour utiliser les nouvelles transformations de torchvision
+   - Implemented the `visualize_data_augmentation` method to visualize augmentation effects
+   - Updated to use the new torchvision transformations
 
-## Commandes d'exécution
+## Execution commands
 
-### Entraînement des modèles
+### Model training
 
-1. YourUNet avec Dice Loss :
+1. YourUNet with Dice Loss:
 ```bash
 python train.py --model YourUNet --loss Dice --num-epochs 50 --batch_size 16 --lr 0.0001
 ```
 
-2. YourSegNet avec Focal Loss :
+2. YourSegNet with Focal Loss:
 ```bash
 python train.py --model YourSegNet --loss Focal --num-epochs 50 --batch_size 16 --lr 0.0001
 ```
 
-### Prédiction avec un modèle entraîné
+### Prediction with a trained model
 ```bash
 python train.py --model YourUNet --predict path/to/weights.pth
 ```
 
 ### Checkpointing
-Les checkpoints sont automatiquement sauvegardés dans le dossier `checkpoints/` :
-- `checkpoint_epoch_X.pth` : Checkpoint de chaque époque
-- `best_model.pth` : Meilleur modèle selon la précision de validation
+Checkpoints are automatically saved in the `checkpoints/` folder:
+- `checkpoint_epoch_X.pth`: Checkpoint for each epoch
+- `best_model.pth`: Best model according to validation accuracy
 
-Pour charger un checkpoint spécifique :
+To load a specific checkpoint:
 ```bash
 python train.py --model YourUNet --checkpoint checkpoints/best_model.pth
 ```
 
-Pour continuer l'entraînement à partir d'un checkpoint :
+To continue training from a checkpoint:
 ```bash
 python train.py --model YourUNet --resume checkpoints/checkpoint_epoch_10.pth
 ```
 
-### Augmentation de données
-Pour activer les augmentations de données lors de l'entraînement, utilisez les options suivantes :
+### Data augmentation
+To enable data augmentation during training, use the following options:
 
-1. Rotation aléatoire (angle jusqu'à 60°) :
+1. Random rotation (angle up to 60°):
 ```bash
 python train.py --model YourUNet --loss Dice --rotation
 ```
 
-2. Déformation élastique (paramètres améliorés alpha=50.0, sigma=5.0) :
+2. Elastic deformation (improved parameters alpha=50.0, sigma=5.0):
 ```bash
 python train.py --model YourUNet --loss Dice --elastic
 ```
 
-3. Les deux augmentations combinées :
+3. Both augmentations combined:
 ```bash
 python train.py --model YourUNet --loss Dice --rotation --elastic
 ```
 
-4. Visualiser les effets des augmentations sur quelques images d'exemple :
+4. Visualize the augmentation effects on a few sample images:
 ```bash
 python train.py --model YourUNet --visualize_augmentation --rotation --elastic
 ```
 
-Les images générées pour l'analyse des augmentations sont sauvegardées dans le dossier `figures/` et montrent clairement les effets des transformations à la fois sur les images et sur les masques de segmentation.
+The generated images for augmentation analysis are saved in the `figures/` folder and clearly show the effects of transformations on both the images and the segmentation masks.
 
-## Description des techniques d'augmentation
+## Description of augmentation techniques
 
-### Transformations standard de torchvision
-L'augmentation de données utilise maintenant les transformations standard de torchvision :
-- `transforms.RandomRotation` pour la rotation aléatoire
-- `transforms.ElasticTransform` pour la déformation élastique
-- `transforms.RandomAffine` pour les transformations affines
-- `transforms.RandomHorizontalFlip` pour le retournement horizontal
-- `transforms.RandomVerticalFlip` pour le retournement vertical
+### Standard torchvision transformations
+Data augmentation now uses standard torchvision transforms:
+- `transforms.RandomRotation` for random rotation
+- `transforms.ElasticTransform` for elastic deformation
+- `transforms.RandomAffine` for affine transformations
+- `transforms.RandomHorizontalFlip` for horizontal flipping
+- `transforms.RandomVerticalFlip` for vertical flipping
 
-### Classe ACDCJointTransform
-Cette classe encapsule toutes les transformations et assure :
-- La cohérence entre les images et leurs masques de segmentation
-- La gestion automatique des formats d'entrée/sortie
-- L'application des mêmes transformations aux paires image-masque
-- La préservation de la qualité des images médicales
+### ACDCJointTransform class
+This class encapsulates all transformations and ensures:
+- Consistency between images and their segmentation masks
+- Automatic handling of input/output formats
+- Applying the same transformations to image-mask pairs
+- Preservation of the quality of medical images
 
-### Améliorations apportées
-- Migration complète vers les transformations standard de torchvision
-- Meilleure gestion de la mémoire et des performances
-- Paramètres optimisés pour les images IRM cardiaques
-- Structure modulaire facilitant l'ajout de nouvelles transformations
-- Documentation claire des paramètres et effets des transformations
+### Improvements made
+- Full migration to standard torchvision transformations
+- Better memory management and performance
+- Optimized parameters for cardiac MRI images
+- Modular structure that facilitates adding new transformations
+- Clear documentation of parameters and transformation effects
 
-Ces améliorations permettent une augmentation de données plus robuste et efficace, tout en maintenant la qualité des images médicales.
-### Résultats
+These improvements enable a more robust and efficient data augmentation pipeline while maintaining the quality of medical images.
+
+### Results
 ![aug.png](figures/augmentation_example_1-ex.png)
 
-
-## Description des nouvelles fonctions de perte
+## Description of the new loss functions
 
 ### Dice Loss
-La perte Dice combine la perte Dice avec l'entropie croisée pour une meilleure stabilité :
-- Calcule le coefficient de Dice pour chaque classe
-- Combine avec l'entropie croisée standard
-- Utile pour la segmentation car elle prend en compte le chevauchement entre les prédictions et les cibles
+Dice loss combines Dice loss with cross-entropy for better stability:
+- Computes the Dice coefficient for each class
+- Combines it with standard cross-entropy
+- Useful for segmentation because it accounts for overlap between predictions and targets
 
 ### Focal Loss
-La perte Focal est conçue pour gérer le déséquilibre des classes :
-- Réduit automatiquement le poids des exemples faciles
-- Augmente le poids des exemples difficiles
-- Paramètres ajustables (alpha et gamma) pour contrôler le focus
+Focal loss is designed to handle class imbalance:
+- Automatically reduces the weight of easy examples
+- Increases the weight of difficult examples
+- Adjustable parameters (alpha and gamma) to control the focus
 
-## Améliorations de l'architecture YourSegNet
+## Improvements to the YourSegNet architecture
 
-L'architecture YourSegNet a été significativement améliorée avec plusieurs composants clés :
+The YourSegNet architecture has been significantly improved with several key components:
 
-### Encoder amélioré
-- Utilisation de blocs résiduels pour faciliter l'apprentissage profond
-- Intégration de convolutions dilatées (atrous) pour capturer les contextes multi-échelles
-- Blocs bottleneck pour réduire le nombre de paramètres tout en maintenant la capacité du modèle
-- Structure hiérarchique avec downsampling progressif
+### Improved encoder
+- Use of residual blocks to facilitate deep learning
+- Integration of dilated (atrous) convolutions to capture multi-scale context
+- Bottleneck blocks to reduce the number of parameters while maintaining capacity
+- Hierarchical structure with progressive downsampling
 
-### Decoder optimisé
-- Blocs denses pour une meilleure fusion des caractéristiques
-- Upsampling progressif avec convolutions transposées
-- Skip connections asymétriques améliorées pour préserver les détails fins
-- Mécanisme de fusion optimisé pour combiner les caractéristiques de différents niveaux
+### Optimized decoder
+- Dense blocks for better feature fusion
+- Progressive upsampling with transposed convolutions
+- Improved asymmetric skip connections to preserve fine details
+- Optimized fusion mechanism to combine features from different levels
 
-### Innovations architecturales
-- Combinaison intelligente de blocs résiduels et denses
-- Utilisation stratégique des convolutions atrous pour augmenter le champ réceptif
-- Architecture non-symétrique pour une meilleure efficacité
-- Pipeline de traitement optimisé pour la segmentation d'images IRM cardiaques
+### Architectural innovations
+- Intelligent combination of residual and dense blocks
+- Strategic use of atrous convolutions to increase the receptive field
+- Asymmetric architecture for better efficiency
+- Optimized processing pipeline for cardiac MRI image segmentation
 
-Ces améliorations permettent au modèle de :
-- Capturer plus efficacement les caractéristiques multi-échelles
-- Réduire le nombre de paramètres tout en maintenant la performance
-- Améliorer la précision de segmentation des structures cardiaques
-- Faciliter l'entraînement du réseau profond
+These improvements allow the model to:
+- Capture multi-scale features more effectively
+- Reduce the number of parameters while maintaining performance
+- Improve segmentation accuracy of cardiac structures
+- Facilitate training of the deep network
 
-## Courbes d'entraînement
-[À remplir après l'entraînement des modèles]
+## Training curves
+[To be filled after training the models]
 ### YourSegNet
 ![fig1.png](figures/YourSegNet_metrics.png)
 ### YourUNet
 ![fig3.png](figures/YourUNet_metrics.png)
-
-
-
-
-
 
