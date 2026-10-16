@@ -6,14 +6,14 @@ def read(fname):
 
 
 setup(
-    name="Tp3-ift725",
+    name="Medical Image Segmentation",
     version="0.0.1",
-    author="Pierre-Marc Jodoin",
-    author_email="pierre-marc.jodoin@usherbrooke.ca",
-    description="Code pour le tp3 du cours ift725",
+    author="Pierre-Marc Jodoin & Hassan Kajila",
+    author_email="",
+    description="A Pytorch implementation of a advanced CNN model for image classification",
     license="BSD",
     keywords="Pytorch deep learning cnn",
-    url="http://info.usherbrooke.ca/pmjodoin/cours/ift725/index.html",
+    url="",
     packages=find_packages(exclude=['contrib', 'doc', 'unit_tests']),
     classifiers=[
         "Development Status :: 3 - Alpha",

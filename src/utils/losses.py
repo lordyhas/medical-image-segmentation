@@ -2,10 +2,12 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+# Author: Hassan Kajila
+
 class DiceLoss(nn.Module):
     """
-    Fonction de perte Dice pour YourUNet
-    Combine la perte Dice avec la perte d'entropie croisée pour une meilleure stabilité
+    Dice loss function for YourUNet.
+    Combines Dice loss with cross-entropy loss for better stability.
     """
 
     def __init__(self, smooth=1.0):
@@ -13,20 +15,20 @@ class DiceLoss(nn.Module):
         self.smooth = smooth
 
     def forward(self, predictions, targets):
-        # S'assurer que les prédictions ont la bonne forme
+        # Ensure predictions have the correct shape
         if len(predictions.shape) == 4:
-            # Assurer que les cibles sont des entiers valides dans la plage [0, num_classes-1]
+            # Ensure targets are valid integers in the range [0, num_classes - 1]
             num_classes = predictions.size(1)
             targets = torch.clamp(targets, min=0, max=num_classes - 1)
 
-            # Appliquer softmax pour obtenir les probabilités
+            # Apply softmax to obtain probabilities
             predictions_softmax = F.softmax(predictions, dim=1)
 
-            # Convertir les cibles en one-hot encoding avec permutation des dimensions
-            # Reshape pour correspondre à la dimension attendue [B, C, H, W]
+            # Convert targets to one-hot encoding with dimension permutation
+            # Reshape to match the expected shape [B, C, H, W]
             targets_one_hot = F.one_hot(targets.long(), num_classes=num_classes).permute(0, 3, 1, 2).float()
 
-            # Calculer la perte Dice pour chaque classe
+            # Compute Dice loss for each class
             dice_loss = 0
             for i in range(predictions.size(1)):
                 pred = predictions_softmax[:, i, :, :]
@@ -35,25 +37,25 @@ class DiceLoss(nn.Module):
                 intersection = (pred * target).sum()
                 union = pred.sum() + target.sum()
 
-                # Éviter la division par zéro
+                # Avoid division by zero
                 dice = (2. * intersection + self.smooth) / (union + self.smooth)
                 dice_loss += 1 - dice
 
-            # Moyenne sur toutes les classes
+            # Average across all classes
             dice_loss = dice_loss / predictions.size(1)
 
-            # Calculer l'entropie croisée avec les cibles vérifiées
+            # Compute cross-entropy with validated targets
             ce_loss = F.cross_entropy(predictions, targets.long())
 
             return 0.5 * dice_loss + 0.5 * ce_loss
         else:
-            raise ValueError("Les prédictions doivent avoir 4 dimensions [B, C, H, W]")
+            raise ValueError("Predictions must have 4 dimensions [B, C, H, W]")
 
 
 class FocalLoss(nn.Module):
     """
-    Fonction de perte Focal pour YourSegNet
-    Utile pour gérer le déséquilibre des classes
+    Focal loss function for YourSegNet.
+    Useful for handling class imbalance.
     """
 
     def __init__(self, alpha=1, gamma=2):
@@ -62,7 +64,7 @@ class FocalLoss(nn.Module):
         self.gamma = gamma
 
     def forward(self, predictions, targets):
-        # S'assurer que les cibles sont des entiers valides
+        # Ensure targets are valid integers
         num_classes = predictions.size(1)
         targets = torch.clamp(targets, min=0, max=num_classes - 1)
 

@@ -4,7 +4,7 @@
 """
 University of Sherbrooke
 Date:
-Authors: Mamadou Mountagha BAH & Pierre-Marc Jodoin
+Authors: Hassan Kajila & Pierre-Marc Jodoin
 License:
 Other: Suggestions are welcome
 """

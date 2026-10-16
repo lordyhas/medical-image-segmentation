@@ -3,7 +3,7 @@
 """
 University of Sherbrooke
 Date:
-Authors: Mamadou Mountagha BAH & Pierre-Marc Jodoin
+Authors: Hassan Kajila & Pierre-Marc Jodoin
 License:
 Other: Suggestions are welcome
 """
@@ -24,7 +24,7 @@ import matplotlib.pyplot as plt
 
 class CNNTrainTestManager(object):
     """
-    Class used the train and test the given model in the parameters
+    Class used to train and evaluate the model passed as a parameter.
     """
 
     def __init__(self, model,
@@ -40,12 +40,12 @@ class CNNTrainTestManager(object):
         Args:
             model: model to train
             trainset: dataset used to train the model
-            testset: dataset used to test the model
+            testset: dataset used to evaluate the model
             loss_fn: the loss function used
-            optimizer_factory: A callable to create the optimizer. see optimizer function
-            below for more details
-            validation: wether to use custom validation data or let the one by default
-            use_cuda: to Use the gpu to train the model
+            optimizer_factory: a callable to create the optimizer. See the optimizer
+                factory function below for more details
+            validation: whether to use custom validation data or the default one
+            use_cuda: whether to use the GPU to train the model
             checkpoint_dir: directory to save model checkpoints
         """
         device_name = 'cuda:0' if use_cuda else 'cpu'
@@ -63,7 +63,7 @@ class CNNTrainTestManager(object):
         self.loss_fn = loss_fn
         self.model = model
 
-        # Transférer le modèle et la fonction de perte vers le GPU si disponible
+        # Move the model and loss function to the GPU if available
         self.model = self.model.to(self.device)
         if hasattr(self.loss_fn, 'to'):
             self.loss_fn = self.loss_fn.to(self.device)
@@ -72,23 +72,23 @@ class CNNTrainTestManager(object):
         self.use_cuda = use_cuda
         self.metric_values = {}
 
-        # Initialisation du checkpointing
+        # Initialize checkpointing
         self.checkpoint_dir = checkpoint_dir
         self.best_val_acc = 0.0
         os.makedirs(checkpoint_dir, exist_ok=True)
 
-        # Afficher la taille du modèle (nombre de paramètres)
+        # Display model size (number of parameters)
         total_params = sum(p.numel() for p in self.model.parameters())
         trainable_params = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
-        print(f"Total des paramètres: {total_params:,}")
-        print(f"Paramètres entraînables: {trainable_params:,}")
+        print(f"Total parameters: {total_params:,}")
+        print(f"Trainable parameters: {trainable_params:,}")
 
     def save_checkpoint(self, epoch, is_best=False):
         """
-        Sauvegarde un checkpoint du modèle
+        Saves a model checkpoint.
         Args:
-            epoch: numéro de l'époque actuelle
-            is_best: si True, sauvegarde comme meilleur modèle
+            epoch: current epoch number
+            is_best: if True, saves it as the best model
         """
         checkpoint = {
             'epoch': epoch,
@@ -103,43 +103,43 @@ class CNNTrainTestManager(object):
 
         model_name = self.model.__class__.__name__
 
-        # Sauvegarde du checkpoint de l'époque
+        # Save the epoch checkpoint
         torch.save(checkpoint, os.path.join(self.checkpoint_dir, f'checkpoint_epoch_{epoch}_{model_name}.pth'))
 
-        # Si c'est le meilleur modèle, on le sauvegarde séparément
+        # If it is the best model, save it separately
         if is_best:
             torch.save(checkpoint, os.path.join(self.checkpoint_dir, f'best_model_{model_name}.pth'))
             print(
-                f'Nouveau meilleur modèle sauvegardé avec une précision de validation de {self.metric_values["val_acc"][-1]:.3f}')
+                f'New best model saved with validation accuracy {self.metric_values["val_acc"][-1]:.3f}')
 
     def load_checkpoint(self, checkpoint_path):
         """
-        Charge un checkpoint du modèle
+        Loads a model checkpoint.
         Args:
-            checkpoint_path: chemin vers le fichier de checkpoint
+            checkpoint_path: path to the checkpoint file
         """
-        # Assurer le chargement sur le bon dispositif
+        # Ensure loading on the correct device
         map_location = self.device
         checkpoint = torch.load(checkpoint_path, map_location=map_location)
         self.model.load_state_dict(checkpoint['model_state_dict'])
         self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
 
-        # Si le checkpoint a été sauvegardé sur GPU mais chargé sur CPU, ajuster les états de l'optimiseur
+        # If the checkpoint was saved on GPU but loaded on CPU, adjust optimizer states
         if 'device' in checkpoint and checkpoint['device'] != str(self.device):
             for state in self.optimizer.state.values():
                 for k, v in state.items():
                     if isinstance(v, torch.Tensor):
                         state[k] = v.to(self.device)
 
-        print(f"Checkpoint chargé depuis l'époque {checkpoint['epoch']}")
+        print(f"Checkpoint loaded from epoch {checkpoint['epoch']}")
         return checkpoint['epoch']
 
     def evaluate_on_validation_set(self):
         """
-        function that evaluate the model on the validation set every epoch
+        Function that evaluates the model on the validation set every epoch.
         """
-        # switch to eval mode so that layers like batchnorm's layers nor dropout's layers
-        # works in eval mode instead of training mode
+        # Switch to eval mode so that layers such as batch normalization and dropout
+        # behave correctly instead of training mode
         self.model.eval()
 
         # Get validation data
@@ -150,13 +150,13 @@ class CNNTrainTestManager(object):
 
         with torch.no_grad():
             for j, val_data in enumerate(val_loader, 0):
-                # transfer tensors to the selected device
+                # Transfer tensors to the selected device
                 val_inputs, val_labels = val_data[0].to(self.device), val_data[1].to(self.device)
 
-                # forward pass
+                # Forward pass
                 val_outputs = self.model(val_inputs)
 
-                # compute loss function
+                # Compute loss
                 loss = self.loss_fn(val_outputs, val_labels)
                 validation_losses.append(loss.item())
                 validation_accuracies.append(self.accuracy(val_outputs, val_labels))
@@ -165,26 +165,26 @@ class CNNTrainTestManager(object):
         self.metric_values['val_loss'].append(np.mean(validation_losses))
         self.metric_values['val_acc'].append(np.mean(validation_accuracies))
 
-        # Vérifie si c'est le meilleur modèle
+        # Check whether it is the best model
         current_val_acc = np.mean(validation_accuracies)
         is_best = current_val_acc > self.best_val_acc
         if is_best:
             self.best_val_acc = current_val_acc
 
-        # displays metrics
+        # Display metrics
         print('Validation loss %.3f' % (validation_loss / len(val_loader)))
         print('Validation accuracy %.3f' % (np.mean(validation_accuracies)))
 
-        # switch back to train mode
+        # Switch back to train mode
         self.model.train()
 
         return is_best
 
     def train(self, num_epochs):
         """
-        Train the model for num_epochs times
+        Train the model for num_epochs epochs.
         Args:
-            num_epochs: number times to train the model
+            num_epochs: number of times to train the model
         """
         # Initialize metrics container
         self.metric_values['train_loss'] = []
@@ -192,9 +192,9 @@ class CNNTrainTestManager(object):
         self.metric_values['val_loss'] = []
         self.metric_values['val_acc'] = []
 
-        # Create pytorch's train data_loader
+        # Create the PyTorch train data loader
         train_loader = self.data_manager.get_train_set()
-        # train num_epochs times
+        # Train for num_epochs epochs
         for epoch in range(num_epochs):
             print("Epoch: {} of {}".format(epoch + 1, num_epochs))
             train_loss = 0.0
@@ -204,21 +204,21 @@ class CNNTrainTestManager(object):
                 train_losses = []
                 train_accuracies = []
                 for i, data in enumerate(train_loader, 0):
-                    # transfer tensors to selected device
+                    # Transfer tensors to the selected device
                     train_inputs, train_labels = data[0].to(self.device), data[1].to(self.device)
 
-                    # zero the parameter gradients
+                    # Zero the parameter gradients
                     self.optimizer.zero_grad()
 
-                    # forward pass
+                    # Forward pass
                     train_outputs = self.model(train_inputs)
-                    # computes loss using loss function loss_fn
+                    # Compute loss using the loss_fn function
                     loss = self.loss_fn(train_outputs, train_labels)
 
                     # Use autograd to compute the backward pass.
                     loss.backward()
 
-                    # updates the weights using gradient descent
+                    # Update the weights using gradient descent
                     """
                     Way it could be done manually
 
@@ -233,19 +233,19 @@ class CNNTrainTestManager(object):
                     acc = self.accuracy(train_outputs, train_labels)
                     train_accuracies.append(acc)
 
-                    # print metrics along progress bar
+                    # Print metrics along the progress bar
                     train_loss += loss.item()
                     train_acc += acc
                     # t.set_postfix({loss='{:05.3f}'.format(train_loss / (i + 1))})
                     t.set_postfix({'Train loss': train_loss / (i + 1), "train_acc": train_acc / (i + 1)})
                     t.update()
 
-            # evaluate the model on validation data after each epoch
+            # Evaluate the model on validation data after each epoch
             self.metric_values['train_loss'].append(np.mean(train_losses))
             self.metric_values['train_acc'].append(np.mean(train_accuracies))
             is_best = self.evaluate_on_validation_set()
 
-            # Sauvegarde du checkpoint
+            # Save checkpoint
             self.save_checkpoint(epoch, is_best)
 
         print("Finished training.")
@@ -260,7 +260,7 @@ class CNNTrainTestManager(object):
             Accuracy of the model
         """
         if isinstance(self.model, UNet) or isinstance(self.model, YourSegNet) or isinstance(self.model, YourUNet):
-            # compute the mean of the 3 classes's dice score
+            # Compute the mean Dice score across the classes
             return mean_dice(outputs, labels).item()
         else:
             predicted = outputs.argmax(dim=1)
@@ -315,7 +315,7 @@ class CNNTrainTestManager(object):
         os.makedirs(figures_dir, exist_ok=True)
         fig_path = os.path.join(figures_dir, f'{model_name}_metrics.png')
         f.savefig(fig_path)
-        print(f'Métriques sauvegardées dans: {fig_path}')
+        print(f'Metrics saved to: {fig_path}')
 
         plt.show()
 
@@ -356,26 +356,26 @@ class CNNTrainTestManager(object):
             else:
                 img = img.numpy()
 
-            # plot the image
+            # Plot the image
             f = plt.figure(figsize=(10, 10))
             ax1 = f.add_subplot(221)
             ax1.imshow(img)
             ax1.set_title('image')
             ax1.axis('off')
 
-            # plot the ground truth
+            # Plot the ground truth
             ax2 = f.add_subplot(222)
             ax2.imshow(gt.astype('uint8'))
             ax2.axis('off')
             ax2.set_title('ground truth')
 
-            # plot the image
+            # Plot the image
             ax3 = f.add_subplot(223)
             ax3.imshow(img)
             ax3.set_title('image')
             ax3.axis('off')
 
-            # plot the predicted mask
+            # Plot the predicted mask
             ax4 = f.add_subplot(224)
             ax4.imshow(prediction.astype('uint8'))
             ax4.set_title('predicted segmentation')
@@ -389,16 +389,16 @@ class CNNTrainTestManager(object):
             os.makedirs(figures_dir, exist_ok=True)
             fig_path = os.path.join(figures_dir, f'{model_name}_prediction_{it}.png')
             f.savefig(fig_path)
-            print(f'Prédiction sauvegardée dans: {fig_path}')
+            print(f'Prediction saved to: {fig_path}')
 
             # show image
             plt.show()
 
     def visualize_data_augmentation(self, num_samples=3):
         """
-        Visualise les effets de l'augmentation de données sur quelques images et leurs masques
+        Visualizes the effects of data augmentation on a few images and their masks.
         Args:
-            num_samples: nombre d'échantillons à visualiser
+            num_samples: number of samples to visualize
         """
         import matplotlib.pyplot as plt
         import random
@@ -407,66 +407,66 @@ class CNNTrainTestManager(object):
         from src.utils.utils import convert_mask_to_rgb_image
         from src.utils.data_augmentation import ACDCJointTransform
 
-        # Obtenir le jeu de données d'entraînement
+        # Get the training dataset
         train_loader = self.data_manager.get_train_set()
 
-        # Vérifier si l'ensemble d'entraînement est vide
+        # Check whether the training set is empty
         if len(train_loader) == 0:
-            print("ATTENTION: L'ensemble d'entraînement est vide! Impossible de visualiser l'augmentation de données.")
+            print("WARNING: The training set is empty! Cannot visualize data augmentation.")
             return
 
-        # Obtenir le nombre réel d'échantillons disponibles
+        # Get the number of available samples
         num_available_samples = min(len(train_loader), num_samples)
         if num_available_samples < num_samples:
             print(
-                f"ATTENTION: Seulement {num_available_samples} échantillons disponibles au lieu de {num_samples} demandés.")
+                f"WARNING: Only {num_available_samples} samples are available instead of the requested {num_samples}.")
 
-        # Créer les transformations d'augmentation pour la démonstration
-        # Utiliser les nouvelles transformations
+        # Create augmentation transforms for demonstration
+        # Use the new transforms
         rotation_transform = ACDCJointTransform(rotation=True, elastic=False, rotation_degrees=60)
         elastic_transform = ACDCJointTransform(rotation=False, elastic=True, elastic_alpha=50.0, elastic_sigma=5.0)
 
-        # Obtenir quelques échantillons du jeu de données
+        # Get a few samples from the dataset
         samples = []
         for i, data in enumerate(train_loader):
             if i >= num_available_samples:
                 break
             samples.append(data)
 
-        # Pour chaque échantillon, appliquer les transformations et afficher les résultats
+        # For each sample, apply the transformations and display the results
         for i, (inputs, labels) in enumerate(samples):
             try:
-                # Déplacer les tenseurs vers le CPU pour traitement
+                # Move tensors to CPU for processing
                 input_img = inputs[0].cpu().numpy()
                 label_img = labels[0].cpu().numpy()
 
-                # Debug - afficher les dimensions
+                # Debug - display shapes
                 print(f"input_img shape: {input_img.shape}")
                 print(f"label_img shape: {label_img.shape}")
 
-                # Supprimer la dimension de canal pour l'image d'entrée si présente
+                # Remove the channel dimension if the input image already has one
                 if len(input_img.shape) == 3 and input_img.shape[0] == 1:
                     input_img = input_img.squeeze(0)
 
-                # Sauvegarder la graine pour assurer la même transformation sur l'image et le masque
+                # Save the seed to ensure the same transform is applied to the image and the mask
                 seed = 42 + i
                 random.seed(seed)
                 np.random.seed(seed)
                 torch.manual_seed(seed)
 
-                # Créer un masque one-hot pour la visualisation
-                if len(label_img.shape) == 2:  # Si le masque est déjà en format catégorique
+                # Create a one-hot mask for visualization
+                if len(label_img.shape) == 2:  # If the mask is already categorical
                     max_class = int(np.max(label_img)) + 1
                     label_one_hot = np.zeros((input_img.shape[0], input_img.shape[1], max_class))
-                    for c in range(max_class):  # Pour chaque classe
+                    for c in range(max_class):  # For each class
                         label_one_hot[:, :, c] = (label_img == c).astype(np.float32)
                 else:
-                    max_class = 4  # Par défaut pour ACDC
+                    max_class = 4  # Default for ACDC
                     label_one_hot = np.zeros((input_img.shape[0], input_img.shape[1], max_class))
-                    for c in range(max_class):  # Pour chaque classe
+                    for c in range(max_class):  # For each class
                         label_one_hot[:, :, c] = (label_img == c).astype(np.float32)
 
-                # Transformer l'image d'entrée et les étiquettes avec rotation
+                # Transform the input image and labels with rotation
                 random.seed(seed)
                 np.random.seed(seed)
                 torch.manual_seed(seed)
@@ -474,7 +474,7 @@ class CNNTrainTestManager(object):
                                                                                     torch.Tensor) else rotation_transform(
                     input_img)
 
-                # Pour la rotation du masque
+                # For rotation on the mask
                 rotated_label = np.zeros_like(label_img)
                 for c in range(max_class):
                     mask = (label_img == c).astype(np.float32)
@@ -486,7 +486,7 @@ class CNNTrainTestManager(object):
                         mask)
                     rotated_label[rotated_mask > 0.5] = c
 
-                # Appliquer la déformation élastique
+                # Apply elastic deformation
                 seed = 73 + i
                 random.seed(seed)
                 np.random.seed(seed)
@@ -506,59 +506,59 @@ class CNNTrainTestManager(object):
                         mask)
                     elastic_label[elastic_mask > 0.5] = c
 
-                # Convertir les masques en images RGB pour l'affichage
+                # Convert masks to RGB images for display
                 original_label_rgb = convert_mask_to_rgb_image(label_img)
                 rotated_label_rgb = convert_mask_to_rgb_image(rotated_label)
                 elastic_label_rgb = convert_mask_to_rgb_image(elastic_label)
 
-                # Créer la figure pour afficher les résultats
+                # Create the figure to display the results
                 fig, axs = plt.subplots(2, 3, figsize=(15, 10))
 
-                # Afficher les images originales et transformées
+                # Display original and transformed images
                 axs[0, 0].imshow(input_img, cmap='gray')
-                axs[0, 0].set_title('Image originale')
+                axs[0, 0].set_title('Original image')
                 axs[0, 0].axis('off')
 
                 axs[0, 1].imshow(rotated_input, cmap='gray')
-                axs[0, 1].set_title('Image avec rotation')
+                axs[0, 1].set_title('Image with rotation')
                 axs[0, 1].axis('off')
 
                 axs[0, 2].imshow(elastic_input, cmap='gray')
-                axs[0, 2].set_title('Image avec déformation élastique')
+                axs[0, 2].set_title('Image with elastic deformation')
                 axs[0, 2].axis('off')
 
-                # Afficher les masques originaux et transformés
+                # Display original and transformed masks
                 axs[1, 0].imshow(original_label_rgb)
-                axs[1, 0].set_title('Masque original')
+                axs[1, 0].set_title('Original mask')
                 axs[1, 0].axis('off')
 
                 axs[1, 1].imshow(rotated_label_rgb)
-                axs[1, 1].set_title('Masque avec rotation')
+                axs[1, 1].set_title('Mask with rotation')
                 axs[1, 1].axis('off')
 
                 axs[1, 2].imshow(elastic_label_rgb)
-                axs[1, 2].set_title('Masque avec déformation élastique')
+                axs[1, 2].set_title('Mask with elastic deformation')
                 axs[1, 2].axis('off')
 
                 plt.tight_layout()
 
-                # Créer le répertoire pour sauvegarder les figures s'il n'existe pas
+                # Create the directory to save the figures if it does not exist
                 figures_dir = 'figures'
                 os.makedirs(figures_dir, exist_ok=True)
 
-                # Sauvegarder la figure
+                # Save the figure
                 fig_path = os.path.join(figures_dir, f'augmentation_example_{i + 1}.png')
                 plt.savefig(fig_path)
-                print(f"Image d'exemple d'augmentation sauvegardée sous {fig_path}")
+                print(f"Sample augmentation image saved to {fig_path}")
 
                 plt.close(fig)
 
             except Exception as e:
-                print(f"Erreur lors de la visualisation de l'échantillon {i}: {str(e)}")
+                print(f"Error while visualizing sample {i}: {str(e)}")
                 continue
 
-        print(f"Visualisation de l'augmentation de données terminée.")
-        print(f"Les images d'exemple ont été sauvegardées dans le répertoire 'figures/'.")
+        print(f"Data augmentation visualization completed.")
+        print(f"Example images were saved in the 'figures/' directory.")
 
 def optimizer_setup(optimizer_class: Type[torch.optim.Optimizer], **hyperparameters) -> \
         Callable[[torch.nn.Module], torch.optim.Optimizer]:

@@ -9,15 +9,15 @@ from src.models.CNNBaseModel import CNNBaseModel
 
 class YourUNet(CNNBaseModel):
     """
-    Version améliorée du UNet avec :
-    - Convolutions séparables
-    - Couches résiduelles
-    - Blocs bottleneck
+    Improved UNet version with:
+    - Separable convolutions
+    - Residual layers
+    - Bottleneck blocks
     """
 
     def __init__(self, num_classes=4, init_weights=True):
         """
-        Builds yourUNet  model.
+        Builds yourUNet model.
         Args:
             num_classes(int): number of classes. default 10(cifar10 or svhn)
             init_weights(bool): when true uses _initialize_weights function to initialize
@@ -46,7 +46,7 @@ class YourUNet(CNNBaseModel):
         self.conv_decoder2 = self._expansion_block(192, 64)
         self.final_layer = self._final_block(96, 32, num_classes)  # 32 + 32 = 64
 
-        # Couche supplémentaire pour assurer les bonnes dimensions
+        # Additional layer to ensure correct dimensions
         self.final_conv = nn.Conv2d(num_classes, num_classes, kernel_size=1)
 
     def forward(self, x):
@@ -81,7 +81,7 @@ class YourUNet(CNNBaseModel):
     @staticmethod
     def _separable_conv(in_channels, out_channels, kernel_size=3):
         """
-        Implémente une convolution séparable (depthwise + pointwise)
+        Implements a separable convolution (depthwise + pointwise)
         """
         return nn.Sequential(
             nn.Conv2d(in_channels, in_channels, kernel_size, padding=kernel_size // 2, groups=in_channels),
@@ -91,7 +91,7 @@ class YourUNet(CNNBaseModel):
     @staticmethod
     def _residual_block(in_channels, out_channels):
         """
-        Bloc résiduel avec convolutions séparables
+        Residual block with separable convolutions
         """
         return nn.Sequential(
             YourUNet._separable_conv(in_channels, out_channels),
@@ -105,7 +105,7 @@ class YourUNet(CNNBaseModel):
     @staticmethod
     def _conv_block(in_channels, out_channels, kernel_size=3):
         """
-        Bloc de convolution avec connexions résiduelles
+        Convolution block with residual connections
         """
         return nn.Sequential(
             YourUNet._residual_block(in_channels, out_channels),
@@ -115,7 +115,7 @@ class YourUNet(CNNBaseModel):
     @staticmethod
     def _contraction_block(in_channels, out_channels, kernel_size=3):
         """
-        Bloc de contraction avec convolutions séparables
+        Contraction block with separable convolutions
         """
         return nn.Sequential(
             nn.MaxPool2d(kernel_size=2),
@@ -126,7 +126,7 @@ class YourUNet(CNNBaseModel):
     @staticmethod
     def _bottleneck_block(in_channels, out_channels):
         """
-        Bloc bottleneck pour réduire la dimensionnalité
+        Bottleneck block to reduce dimensionality
         """
         return nn.Sequential(
             nn.Conv2d(in_channels, out_channels // 2, 1),
@@ -140,7 +140,7 @@ class YourUNet(CNNBaseModel):
     @staticmethod
     def _expansion_block(in_channels, out_channels, kernel_size=3):
         """
-        Bloc d'expansion avec convolutions séparables
+        Expansion block with separable convolutions
         """
         return nn.Sequential(
             YourUNet._residual_block(in_channels, out_channels),
@@ -150,7 +150,7 @@ class YourUNet(CNNBaseModel):
     @staticmethod
     def _final_block(in_channels, mid_channels, out_channels, kernel_size=3):
         """
-        Bloc final avec convolutions séparables
+        Final block with separable convolutions
         """
         return nn.Sequential(
             YourUNet._residual_block(in_channels, mid_channels),

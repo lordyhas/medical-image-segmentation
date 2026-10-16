@@ -18,7 +18,7 @@ from torchvision import datasets
 import numpy as np
 import os
 import time
-# Importation des modèles et des outils
+# Import models and utilities
 # from src.utils.preprocess import get_data_loader, get_data_loader_svhn
 # from src.utils.utils import optimizer_setup, create_figure
 from src.models.CNNVanilla import CnnVanilla
@@ -34,18 +34,18 @@ from src.manage.CNNTrainTestManager import CNNTrainTestManager, optimizer_setup
 from src.utils.losses import FocalLoss, DiceLoss
 from src.utils.data_augmentation import ACDCJointTransform
 
-# Vérification et affichage des informations sur le GPU
+# verify if GPU is available and print the number of GPUs available
 print("=" * 50)
 use_cuda = torch.cuda.is_available()
-print(f"CUDA disponible: {use_cuda}")
+print(f"CUDA available: {use_cuda}")
 if use_cuda:
-    print(f"Nombre de GPUs: {torch.cuda.device_count()}")
-    print(f"GPU utilisé: {torch.cuda.get_device_name(0)}")
-    print(f"Index du GPU actif: {torch.cuda.current_device()}")
-    # Réserver la mémoire GPU pour éviter les fragmentations
+    print(f"Number of GPUs: {torch.cuda.device_count()}")
+    print(f"GPU used: {torch.cuda.get_device_name(0)}")
+    print(f"Index of active GPU: {torch.cuda.current_device()}")
+    # Reserve GPU memory to avoid fragmentation
     torch.backends.cudnn.benchmark = True
 else:
-    print("ATTENTION: Aucun GPU détecté! L'entraînement sera effectué sur CPU.")
+    print("ATTENTION: No GPU detected! Training will be performed on CPU.")
 print("=" * 50)
 
 
@@ -96,17 +96,17 @@ def argument_parser():
 
 def display_time(elapsed_time):
     """
-    Affiche le temps écoulé au format approprié (secondes, minutes ou heures).
+    Displays the elapsed time in an appropriate format (seconds, minutes, or hours).
     """
     print("")
     if elapsed_time < 60:
-        print(f"Temps d'entraînement total: {elapsed_time:.2f} secondes")
+        print(f"Total training time: {elapsed_time:.2f} seconds")
     elif elapsed_time < 3600:
         elapsed_time /= 60
-        print(f"Temps d'entraînement total: {elapsed_time:.2f} minutes")
+        print(f"Total training time: {elapsed_time:.2f} minutes")
     else:
         elapsed_time /= 3600
-        print(f"Temps d'entraînement total: {elapsed_time:.2f} heures")
+        print(f"Total training time: {elapsed_time:.2f} hours")
 
 
 if __name__ == "__main__":
@@ -122,25 +122,25 @@ if __name__ == "__main__":
     use_elastic = args.elastic
     use_flip_crop = args.flip_crop
 
-    # Affichage des options d'augmentation activées
+    # Display activated augmentation options
     if data_augment:
-        print('Augmentation de données de base activée!')
+        print('Basic data augmentation enabled!')
     if use_rotation:
-        print('Augmentation par rotation aléatoire activée!')
+        print('Random rotation augmentation enabled!')
     if use_elastic:
-        print('Augmentation par déformation élastique activée!')
+        print('Elastic deformation augmentation enabled!')
     if not (data_augment or use_rotation or use_elastic):
-        print('Aucune augmentation de données activée!')
+        print('No data augmentation enabled!')
 
-    # set hdf5 path according your hdf5 file location
+    # Set the HDF5 path according to your file location
     acdc_hdf5_file = 'data/ift780_acdc.hdf5'
 
-    # Préparation des transformations pour ACDC
+    # Prepare ACDC transforms
     acdc_transforms = []
 
     if use_rotation or use_elastic:
         def transform_func(x):
-            # Appliquer les transformations d'augmentation
+            # Apply augmentation transforms
             transform = ACDCJointTransform(
                 rotation=use_rotation,
                 elastic=use_elastic,
@@ -151,10 +151,10 @@ if __name__ == "__main__":
 
             result = transform(x)
 
-            # Assurer le format correct pour PyTorch (NCHW)
+            # Ensure the correct format for PyTorch (NCHW)
             if isinstance(result, torch.Tensor):
                 if len(result.shape) == 2:  # (H, W)
-                    result = result.unsqueeze(0)  # Ajouter dimension canal -> (1, H, W)
+                    result = result.unsqueeze(0)  # Add channel dimension -> (1, H, W)
                 elif len(result.shape) == 3 and result.shape[2] <= 4:  # (H, W, C)
                     result = result.permute(2, 0, 1)  # -> (C, H, W)
             else:  # Numpy array
@@ -181,10 +181,10 @@ if __name__ == "__main__":
         )
         acdc_base_transform = flip_crop_transform
     else:
-        # Sinon, utiliser seulement la conversion en tenseur
+        # Otherwise, use tensor conversion only
         acdc_base_transform = transforms.ToTensor()
 
-    # Transformations pour CIFAR10/SVHN
+    # Transformations for CIFAR10/SVHN
     data_augment_transform = transforms.Compose(
         [
             transforms.RandomCrop(32),
@@ -217,7 +217,7 @@ if __name__ == "__main__":
     elif args.optimizer == 'Adam':
         optimizer_factory = optimizer_setup(optim.Adam, lr=learning_rate)
 
-    # Sélection de la fonction de perte
+    # Select the loss function
     if args.loss == "CE":
         loss_fn = nn.CrossEntropyLoss()
     elif args.loss == "Dice":
@@ -236,34 +236,34 @@ if __name__ == "__main__":
     elif args.model == 'YourUNet':
         model = YourUNet(num_classes=4)
         args.dataset = 'acdc'
-        # Créer le dataset avec les options d'augmentation
+        # Create the dataset with augmentation settings
         train_set = HDF5Dataset('train', acdc_hdf5_file, transform=acdc_base_transform)
         test_set = HDF5Dataset('test', acdc_hdf5_file, transform=acdc_base_transform)
         if args.max_samples is not None:
-            print(f"Utilisation de {args.max_samples} échantillons pour l'entraînement")
+            print(f"Using {args.max_samples} samples for training")
             train_set = torch.utils.data.Subset(train_set, range(min(args.max_samples, len(train_set))))
     elif args.model == 'YourSegNet':
         model = YourSegNet(num_classes=4)
         args.dataset = 'acdc'
-        # Créer le dataset avec les options d'augmentation
+        # Create the dataset with augmentation settings
         train_set = HDF5Dataset('train', acdc_hdf5_file, transform=acdc_base_transform)
         test_set = HDF5Dataset('test', acdc_hdf5_file, transform=acdc_base_transform)
         if args.max_samples is not None:
-            print(f"Utilisation de {args.max_samples} échantillons pour l'entraînement")
+            print(f"Using {args.max_samples} samples for training")
             train_set = torch.utils.data.Subset(train_set, range(min(args.max_samples, len(train_set))))
     elif args.model == 'UNet':
         model = UNet(num_classes=4)
         args.dataset = 'acdc'
-        # Créer le dataset avec les options d'augmentation
+        # Create the dataset with augmentation settings
         train_set = HDF5Dataset('train', acdc_hdf5_file, transform=acdc_base_transform)
         test_set = HDF5Dataset('test', acdc_hdf5_file, transform=acdc_base_transform)
 
-    # Créer un répertoire de checkpoint spécifique au modèle
+    # Create a model-specific checkpoint directory
     checkpoint_dir = f'checkpoints/{args.model}_{args.loss}'
     if args.max_samples is not None:
         checkpoint_dir += f'_samples{args.max_samples}'
     os.makedirs(checkpoint_dir, exist_ok=True)
-    print(f"Les checkpoints seront sauvegardés dans: {checkpoint_dir}")
+    print(f"Checkpoints will be saved in: {checkpoint_dir}")
 
     model_trainer = CNNTrainTestManager(model=model,
                                         trainset=train_set,
@@ -276,47 +276,47 @@ if __name__ == "__main__":
                                         checkpoint_dir=checkpoint_dir)
 
     if args.predict is not None:
-        # Chargement du checkpoint
-        print(f"Chargement du checkpoint: {args.predict}")
+        # Load checkpoint
+        print(f"Loading checkpoint: {args.predict}")
         checkpoint = torch.load(args.predict, map_location=torch.device('cuda' if use_cuda else 'cpu'))
 
-        # Vérifier si le checkpoint contient model_state_dict (nouveau format) ou directement les poids (ancien format)
+        # Check whether the checkpoint contains model_state_dict (new format) or weights directly (old format)
         if 'model_state_dict' in checkpoint:
             model.load_state_dict(checkpoint['model_state_dict'])
-            print(f"Précision de validation du modèle chargé: {checkpoint.get('val_acc', 'N/A')}")
+            print(f"Validation accuracy of loaded model: {checkpoint.get('val_acc', 'N/A')}")
         else:
             model.load_state_dict(checkpoint)
 
-        print("Prédiction de masques pour des images aléatoires du jeu de test")
+        print("Predicting masks for random images in the test set")
         model_trainer.plot_image_mask_prediction()
     elif args.visualize_augmentation:
-        # Visualiser les effets de l'augmentation de données
-        print("Visualisation des effets de l'augmentation de données...")
+        # Visualize the effects of data augmentation
+        print("Visualizing the effects of data augmentation...")
         model_trainer.visualize_data_augmentation(num_samples=3)
     else:
-        # Afficher des informations sur l'utilisation du GPU
+        # Display GPU usage information
         if use_cuda:
             print(
-                f"Entraînement de {model.__class__.__name__} sur {args.dataset} pour {args.num_epochs} époques utilisant GPU: {torch.cuda.get_device_name(0)}")
+                f"Training {model.__class__.__name__} on {args.dataset} for {args.num_epochs} epochs using GPU: {torch.cuda.get_device_name(0)}")
         else:
             print(
-                f"Entraînement de {model.__class__.__name__} sur {args.dataset} pour {args.num_epochs} époques utilisant CPU")
+                f"Training {model.__class__.__name__} on {args.dataset} for {args.num_epochs} epochs using CPU")
 
         start_time = time.time()
 
         model_trainer.train(num_epochs)
 
-        # Afficher les métriques finales
+        # Display final metrics
         final_train_acc = model_trainer.metric_values['train_acc'][-1]
         final_val_acc = model_trainer.metric_values['val_acc'][-1]
         final_train_loss = model_trainer.metric_values['train_loss'][-1]
         final_val_loss = model_trainer.metric_values['val_loss'][-1]
 
-        print("\n" + "=" * 30 + " RÉSULTATS FINAUX " + "=" * 30)
-        print(f"Accuracy d'entraînement finale: {final_train_acc:.4f}")
-        print(f"Accuracy de validation finale: {final_val_acc:.4f}")
-        print(f"Loss d'entraînement finale: {final_train_loss:.4f}")
-        print(f"Loss de validation finale: {final_val_loss:.4f}")
+        print("\n" + "=" * 30 + " FINAL RESULTS " + "=" * 30)
+        print(f"Final training accuracy: {final_train_acc:.4f}")
+        print(f"Final validation accuracy: {final_val_acc:.4f}")
+        print(f"Final training loss: {final_train_loss:.4f}")
+        print(f"Final validation loss: {final_val_loss:.4f}")
         print("=" * 77 + "\n")
 
         model_trainer.evaluate_on_test_set()

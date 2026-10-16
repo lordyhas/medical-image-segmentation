@@ -7,22 +7,22 @@ from src.models.CNNBaseModel import CNNBaseModel
 from src.models.CNNBlocks import ResidualBlock, DenseBlock, BottleneckBlock
 # Author : Hassan Kajila
 '''
-Réseau YourSegNet amélioré avec:
-- Blocs résiduels
-- Blocs denses
-- Blocs bottleneck
-- Convolutions dilatées (atrous)
-- Skip connections asymétriques
+Improved YourSegNet network with:
+- Residual blocks
+- Dense blocks
+- Bottleneck blocks
+- Dilated (atrous) convolutions
+- Asymmetric skip connections
 '''
 
 
 class YourSegNet(CNNBaseModel):
     """
-    Architecture non-symétrique inspirée de DeepLabV3 avec :
-    - Encoder profond avec atrous convolutions et blocs résiduels
-    - Decoder léger avec upsampling progressif et blocs denses
-    - Skip connections asymétriques améliorées
-    - Blocs bottleneck pour réduire les paramètres
+    Asymmetric architecture inspired by DeepLabV3 with:
+    - Deep encoder with atrous convolutions and residual blocks
+    - Lightweight decoder with progressive upsampling and dense blocks
+    - Improved asymmetric skip connections
+    - Bottleneck blocks to reduce parameters
     """
 
     def __init__(self, num_classes=4, init_weights=True):
@@ -35,16 +35,16 @@ class YourSegNet(CNNBaseModel):
         """
         super().__init__(num_classes, init_weights)
 
-        # Encoder profond avec blocs résiduels
+        # Deep encoder with residual blocks
         in_channels = 1
         self.encoder1 = self._encoder_block(in_channels, 64)
         self.encoder2 = self._encoder_block(64, 128)
         self.encoder3 = nn.Sequential(
-            ResidualBlock(128, 256, stride=2),  # Stride 2 pour le downsampling
+            ResidualBlock(128, 256, stride=2),  # Stride 2 for downsampling
             ResidualBlock(256, 256)
         )
 
-        # Blocs Atrous-Bottleneck pour capturer les contextes multi-échelles
+        # Atrous-Bottleneck blocks to capture multi-scale context
         self.encoder4 = nn.Sequential(
             self._atrous_bottleneck_block(256, 512, dilation=2),
             ResidualBlock(512, 512)
@@ -54,18 +54,18 @@ class YourSegNet(CNNBaseModel):
             ResidualBlock(1024, 1024)
         )
 
-        # Decoder léger avec blocs denses pour une meilleure fusion des caractéristiques
+        # Lightweight decoder with dense blocks for better feature fusion
         self.decoder4 = self._decoder_block(1024, 512)
         self.decoder3 = self._decoder_block(512, 256)
         self.decoder2 = self._decoder_block(256, 128)
         self.decoder1 = self._decoder_block(128, 64)
 
-        # Couches de fusion pour les skip connections
-        self.fusion3 = self._fusion_block(256 + 256, out_channels=256)  # Sortie: 256 canaux pour decoder2
-        self.fusion2 = self._fusion_block(128 + 128, out_channels=128)  # Sortie: 128 canaux pour decoder1
-        self.fusion1 = self._fusion_block(64 + 64, out_channels=64)  # Sortie: 64 canaux pour la couche finale
+        # Fusion layers for skip connections
+        self.fusion3 = self._fusion_block(256 + 256, out_channels=256)  # Output: 256 channels for decoder2
+        self.fusion2 = self._fusion_block(128 + 128, out_channels=128)  # Output: 128 channels for decoder1
+        self.fusion1 = self._fusion_block(64 + 64, out_channels=64)  # Output: 64 channels for the final layer
 
-        # Couche finale
+        # Final layer
         self.final = nn.Sequential(
             nn.Conv2d(64, 32, 3, padding=1),
             nn.ReLU(),
@@ -81,10 +81,10 @@ class YourSegNet(CNNBaseModel):
         e4 = self.encoder4(e3)
         e5 = self.encoder5(e4)
 
-        # Decoder avec skip connections améliorées
+        # Decoder with improved skip connections
         d4 = self.decoder4(e5)
 
-        # Concaténation et fusion
+        # Concatenation and fusion
         d3_concat = torch.cat([self.decoder3(d4), e3], dim=1)
         d3 = self.fusion3(d3_concat)
 
@@ -94,7 +94,7 @@ class YourSegNet(CNNBaseModel):
         d1_concat = torch.cat([self.decoder1(d2), e1], dim=1)
         d1 = self.fusion1(d1_concat)
 
-        # Upsample final pour obtenir la taille d'origine
+        # Final upsample to restore original size
         output = self.final(d1)
         output = F.interpolate(output, size=x.shape[2:], mode='bilinear', align_corners=False)
         return output
@@ -102,22 +102,22 @@ class YourSegNet(CNNBaseModel):
     @staticmethod
     def _encoder_block(in_channels, out_channels):
         """
-        Bloc encodeur avec convolutions standard et ResidualBlock
+        Encoder block with standard convolutions and ResidualBlock
         """
         return nn.Sequential(
             nn.Conv2d(in_channels, out_channels, 3, padding=1),
             nn.ReLU(),
             nn.BatchNorm2d(out_channels),
-            ResidualBlock(out_channels, out_channels),  # Ajout d'un bloc résiduel
+            ResidualBlock(out_channels, out_channels),  # Add a residual block
             nn.MaxPool2d(2)
         )
 
     @staticmethod
     def _atrous_bottleneck_block(in_channels, out_channels, dilation):
         """
-        Bloc combinant atrous convolutions et bottleneck pour efficacité
+        Block combining atrous convolutions and bottleneck for efficiency
         """
-        mid_channels = out_channels // 4  # Facteur de réduction bottleneck
+        mid_channels = out_channels // 4  # Bottleneck reduction factor
         return nn.Sequential(
             # Bottleneck down
             nn.Conv2d(in_channels, mid_channels, 1),
@@ -139,7 +139,7 @@ class YourSegNet(CNNBaseModel):
     @staticmethod
     def _decoder_block(in_channels, out_channels):
         """
-        Bloc décodeur avec upsampling et less convolutions
+        Decoder block with upsampling and fewer convolutions
         """
         return nn.Sequential(
             nn.ConvTranspose2d(in_channels, out_channels, 2, stride=2),
@@ -150,19 +150,19 @@ class YourSegNet(CNNBaseModel):
     @staticmethod
     def _fusion_block(in_channels, out_channels):
         """
-        Bloc de fusion utilisant DenseBlock pour améliorer la combinaison des features
+        Fusion block using DenseBlock to improve feature combination
 
         Args:
-            in_channels: nombre de canaux d'entrée (sum des canaux concaténés)
-            out_channels: nombre de canaux de sortie (doit correspondre à l'entrée du bloc suivant)
+            in_channels: number of input channels (sum of concatenated channels)
+            out_channels: number of output channels (must match the next block input)
         """
         mid_channels = in_channels // 2
         return nn.Sequential(
-            nn.Conv2d(in_channels, mid_channels, 1),  # Réduction initiale des canaux
+            nn.Conv2d(in_channels, mid_channels, 1),  # Initial channel reduction
             nn.ReLU(),
             nn.BatchNorm2d(mid_channels),
-            DenseBlock(mid_channels),  # Ajoute mid_channels en concaténant -> mid_channels*2
-            nn.Conv2d(mid_channels * 2, out_channels, 1),  # Ajustement au nombre de canaux de sortie souhaité
+            DenseBlock(mid_channels),  # Adds mid_channels by concatenating -> mid_channels*2
+            nn.Conv2d(mid_channels * 2, out_channels, 1),  # Adjust to desired output channels
             nn.ReLU()
         )
 
