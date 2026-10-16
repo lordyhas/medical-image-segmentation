@@ -1,201 +1,208 @@
 # Cardiac MRI Image Segmentation
 
-This project implements neural networks for the segmentation of cardiac MRI images into four classes:
-1. Background
-2. Right ventricle
-3. Myocardium
-4. Left ventricle
+Deep learning pipeline in PyTorch for the semantic segmentation of cardiac MRI slices
+from the [ACDC dataset](https://www.creatis.insa-lyon.fr/Challenge/acdc/) into four classes:
 
-## Modified files
+| Class | Structure       |
+|-------|-----------------|
+| 0     | Background      |
+| 1     | Right ventricle |
+| 2     | Myocardium      |
+| 3     | Left ventricle  |
 
-### Question 1 - Architectures
+The project compares a reference UNet with two custom architectures, `CustomUNet` and
+`CustomSegNet`, and includes segmentation-specific losses, joint image/mask data
+augmentation and a checkpointing system.
 
-1. `src/models/YourUNet.py`
-   - New UNet-based architecture with:
-     - Separable convolutions
-     - Residual layers
-     - Bottleneck blocks
+![Prediction example](figures/CustomUNet_prediction_3.png)
 
-2. `src/models/YourSegNet.py`
-   - Asymmetric architecture inspired by DeepLabV3 with:
-     - Deep encoder with atrous convolutions and residual blocks
-     - Lightweight decoder with progressive upsampling and dense blocks
-     - Improved asymmetric skip connections
-     - Bottleneck blocks to reduce parameters
-     - Residual blocks to facilitate deep learning
-     - Dense blocks for better feature fusion
-     - Dilated (atrous) convolutions to capture multi-scale context
-     - Optimized fusion mechanism for skip connections
+## Highlights
 
-3. `src/utils/losses.py`
-   - New loss functions:
-     - `DiceLoss`: Combines Dice loss with cross-entropy
-     - `FocalLoss`: Handles class imbalance
+- **Two custom architectures** designed and trained from scratch
+  - `CustomUNet`: a lightweight UNet (3.8M parameters) built on depthwise-separable convolutions
+  - `CustomSegNet`: an asymmetric encoder-decoder (31.3M parameters) inspired by DeepLabV3,
+    with atrous convolutions, residual blocks and dense fusion blocks
+- **Segmentation losses**: combined Dice + cross-entropy loss and Focal loss
+- **Data augmentation** applied consistently to images and masks (rotation, elastic deformation)
+- **Checkpointing**: a checkpoint per epoch plus the best model according to the validation score
+- **Evaluation** with the mean Dice score, training curves and prediction figures
 
-4. `/train.py`
-   - Added new models to the options
-   - Integrated the new loss functions
-   - Added ACDC dataset support
+## Results
 
-### Question 2 - Checkpointing
+Both models were trained for 50 epochs on ACDC. The score reported on the curves is the
+mean Dice score over the classes.
 
-1. `src/manage/CNNTrainTestManager.py`
-   - Added checkpointing system
-   - Automatic saving of the best model
-   - Saving checkpoints at every epoch
-   - Ability to load an existing checkpoint
+| Model          | Parameters | Validation mean Dice (50 epochs) |
+|----------------|-----------:|:--------------------------------:|
+| `CustomUNet`   | 3.8M       | ≈ 0.81                           |
+| `CustomSegNet` | 31.3M      | ≈ 0.85                           |
 
-### Question 3 - Data Augmentation
+### CustomSegNet
 
-1. `src/utils/augmentation.py`
-   - Implementation of the advanced augmentation class `ACDCJointTransform`
-   - Uses standard torchvision transformations
-   - Maintains consistency between images and masks
-   - Improved parameters (rotation up to 60°, stronger deformation)
+![CustomSegNet training curves](figures/CustomSegNet_metrics.png)
 
-2. `train.py`
-   - Integrated the new augmentation class
-   - Migrated custom transforms to standard torchvision transforms
-   - Improved parameters for more visible effects
+![CustomSegNet prediction](figures/CustomSegNet_prediction_3.png)
 
-3. `src/manage/CNNTrainTestManager.py`
-   - Implemented the `visualize_data_augmentation` method to visualize augmentation effects
-   - Updated to use the new torchvision transformations
+### CustomUNet
 
-## Execution commands
+![CustomUNet training curves](figures/CustomUNet_metrics.png)
 
-### Model training
+![CustomUNet prediction](figures/CustomUNet_prediction_4.png)
 
-1. YourUNet with Dice Loss:
-```bash
-python train.py --model YourUNet --loss Dice --num-epochs 50 --batch_size 16 --lr 0.0001
+## Architectures
+
+### CustomUNet (`src/models/CustomUNet.py`)
+
+A UNet variant that keeps the encoder-decoder structure and skip connections of the
+original model while reducing its size:
+
+- Depthwise-separable convolutions instead of standard convolutions
+- Five-level encoder (32 to 512 channels) with batch normalization
+- 1x1 bottleneck block between the encoder and the decoder
+- Transposed convolutions for upsampling
+
+### CustomSegNet (`src/models/CustomSegNet.py`)
+
+An asymmetric architecture with a deep encoder and a lightweight decoder:
+
+- **Encoder**: residual blocks with progressive downsampling, followed by atrous
+  (dilated) bottleneck blocks that capture multi-scale context
+- **Decoder**: progressive upsampling with transposed convolutions
+- **Skip connections**: encoder features are merged in fusion blocks built around a
+  dense block, which preserves fine details
+- **Output**: bilinear upsampling back to the input resolution
+
+Shared building blocks (`ResidualBlock`, `DenseBlock`, `BottleneckBlock`) live in
+`src/models/CNNBlocks.py`.
+
+## Project structure
+
+```
+├── train.py                        # Command-line entry point (training, prediction, visualization)
+├── train.ipynb                     # Notebook walkthrough
+├── requirements.txt
+├── figures/                        # Training curves, predictions and augmentation examples
+└── src/
+    ├── manage/
+    │   ├── CNNTrainTestManager.py  # Training loop, evaluation, checkpointing, plots
+    │   ├── DataManager.py          # Train / validation / test data loaders
+    │   └── HDF5Dataset.py          # ACDC dataset loader (HDF5)
+    ├── models/
+    │   ├── CustomUNet.py
+    │   ├── CustomSegNet.py
+    │   ├── UNet.py                 # Reference UNet
+    │   ├── CNNBlocks.py            # Residual, dense and bottleneck blocks
+    │   └── ...                     # Classification baselines (CnnVanilla, AlexNet, VggNet, ResNet)
+    └── utils/
+        ├── losses.py               # DiceLoss, FocalLoss
+        ├── data_augmentation.py    # ACDCJointTransform
+        └── utils.py                # Dice metric, resizing and visualization helpers
 ```
 
-2. YourSegNet with Focal Loss:
+## Getting started
+
 ```bash
-python train.py --model YourSegNet --loss Focal --num-epochs 50 --batch_size 16 --lr 0.0001
+git clone https://github.com/lordyhas/medical-image-segmentation.git
+cd medical-image-segmentation
+pip install -r requirements.txt
 ```
 
-### Prediction with a trained model
+The ACDC data is not distributed with this repository. The training script expects it
+as an HDF5 file located at `data/ift780_acdc.hdf5`.
+
+## Usage
+
+### Training
+
+CustomUNet with Dice loss:
 ```bash
-python train.py --model YourUNet --predict path/to/weights.pth
+python train.py --model CustomUNet --loss Dice --num-epochs 50 --batch_size 16 --lr 0.0001
 ```
+
+CustomSegNet with Focal loss:
+```bash
+python train.py --model CustomSegNet --loss Focal --num-epochs 50 --batch_size 16 --lr 0.0001
+```
+
+Reference UNet:
+```bash
+python train.py --model UNet --num-epochs 50 --batch_size 16 --lr 0.0001
+```
+
+Run `python train.py --help` for the full list of options (optimizer, validation split,
+`--max_samples` for quick tests, etc.).
 
 ### Checkpointing
-Checkpoints are automatically saved in the `checkpoints/` folder:
-- `checkpoint_epoch_X.pth`: Checkpoint for each epoch
-- `best_model.pth`: Best model according to validation accuracy
 
-To load a specific checkpoint:
+Checkpoints are saved automatically in `checkpoints/<model>_<loss>/`:
+
+- `checkpoint_epoch_<N>_<model>.pth`: checkpoint of each epoch
+- `best_model_<model>.pth`: best model according to the validation score
+
+### Prediction with a trained model
+
 ```bash
-python train.py --model YourUNet --checkpoint checkpoints/best_model.pth
+python train.py --model CustomUNet --loss Dice --predict checkpoints/CustomUNet_Dice/best_model_CustomUNet.pth
 ```
 
-To continue training from a checkpoint:
-```bash
-python train.py --model YourUNet --resume checkpoints/checkpoint_epoch_10.pth
-```
+The predicted masks are saved in `figures/` next to the image and its ground truth.
 
 ### Data augmentation
-To enable data augmentation during training, use the following options:
 
-1. Random rotation (angle up to 60°):
+Random rotation (up to 60°):
 ```bash
-python train.py --model YourUNet --loss Dice --rotation
+python train.py --model CustomUNet --loss Dice --rotation
 ```
 
-2. Elastic deformation (improved parameters alpha=50.0, sigma=5.0):
+Elastic deformation (alpha=50.0, sigma=5.0):
 ```bash
-python train.py --model YourUNet --loss Dice --elastic
+python train.py --model CustomUNet --loss Dice --elastic
 ```
 
-3. Both augmentations combined:
+Both combined:
 ```bash
-python train.py --model YourUNet --loss Dice --rotation --elastic
+python train.py --model CustomUNet --loss Dice --rotation --elastic
 ```
 
-4. Visualize the augmentation effects on a few sample images:
+Visualize the effect of the augmentations on a few samples:
 ```bash
-python train.py --model YourUNet --visualize_augmentation --rotation --elastic
+python train.py --model CustomUNet --visualize_augmentation --rotation --elastic
 ```
 
-The generated images for augmentation analysis are saved in the `figures/` folder and clearly show the effects of transformations on both the images and the segmentation masks.
+![Augmentation example](figures/augmentation_example_1-ex.png)
 
-## Description of augmentation techniques
+The augmentations are implemented by the `ACDCJointTransform` class
+(`src/utils/data_augmentation.py`) on top of standard torchvision transforms
+(`RandomRotation`, `ElasticTransform`). The same random transformation is applied to an
+image and its segmentation mask so that they stay aligned.
 
-### Standard torchvision transformations
-Data augmentation now uses standard torchvision transforms:
-- `transforms.RandomRotation` for random rotation
-- `transforms.ElasticTransform` for elastic deformation
-- `transforms.RandomAffine` for affine transformations
-- `transforms.RandomHorizontalFlip` for horizontal flipping
-- `transforms.RandomVerticalFlip` for vertical flipping
+## Loss functions
 
-### ACDCJointTransform class
-This class encapsulates all transformations and ensures:
-- Consistency between images and their segmentation masks
-- Automatic handling of input/output formats
-- Applying the same transformations to image-mask pairs
-- Preservation of the quality of medical images
+Implemented in `src/utils/losses.py`.
 
-### Improvements made
-- Full migration to standard torchvision transformations
-- Better memory management and performance
-- Optimized parameters for cardiac MRI images
-- Modular structure that facilitates adding new transformations
-- Clear documentation of parameters and transformation effects
+### Dice loss
 
-These improvements enable a more robust and efficient data augmentation pipeline while maintaining the quality of medical images.
+Combines the Dice loss with cross-entropy for better stability:
 
-### Results
-![aug.png](figures/augmentation_example_1-ex.png)
+- Computes the Dice coefficient of each class from the softmax probabilities
+- Averages it with the standard cross-entropy
+- Well suited to segmentation because it directly measures the overlap between
+  predictions and targets
 
-## Description of the new loss functions
+### Focal loss
 
-### Dice Loss
-Dice loss combines Dice loss with cross-entropy for better stability:
-- Computes the Dice coefficient for each class
-- Combines it with standard cross-entropy
-- Useful for segmentation because it accounts for overlap between predictions and targets
+Designed to handle class imbalance (the background dominates cardiac MRI slices):
 
-### Focal Loss
-Focal loss is designed to handle class imbalance:
-- Automatically reduces the weight of easy examples
-- Increases the weight of difficult examples
-- Adjustable parameters (alpha and gamma) to control the focus
+- Reduces the weight of easy examples and increases the weight of difficult ones
+- Adjustable `alpha` and `gamma` parameters to control the focus
 
-## Improvements to the YourSegNet architecture
+## Acknowledgments
 
-The YourSegNet architecture has been significantly improved with several key components:
+This project started as part of a graduate deep learning course at the Université de
+Sherbrooke. The base training framework and the reference models were provided by
+Prof. Pierre-Marc Jodoin; the custom architectures, loss functions, data augmentation and
+checkpointing were developed on top of it.
 
-### Improved encoder
-- Use of residual blocks to facilitate deep learning
-- Integration of dilated (atrous) convolutions to capture multi-scale context
-- Bottleneck blocks to reduce the number of parameters while maintaining capacity
-- Hierarchical structure with progressive downsampling
+## Author
 
-### Optimized decoder
-- Dense blocks for better feature fusion
-- Progressive upsampling with transposed convolutions
-- Improved asymmetric skip connections to preserve fine details
-- Optimized fusion mechanism to combine features from different levels
-
-### Architectural innovations
-- Intelligent combination of residual and dense blocks
-- Strategic use of atrous convolutions to increase the receptive field
-- Asymmetric architecture for better efficiency
-- Optimized processing pipeline for cardiac MRI image segmentation
-
-These improvements allow the model to:
-- Capture multi-scale features more effectively
-- Reduce the number of parameters while maintaining performance
-- Improve segmentation accuracy of cardiac structures
-- Facilitate training of the deep network
-
-## Training curves
-[To be filled after training the models]
-### YourSegNet
-![fig1.png](figures/YourSegNet_metrics.png)
-### YourUNet
-![fig3.png](figures/YourUNet_metrics.png)
-
+**Hassan Kajila** — [GitHub](https://github.com/lordyhas)
