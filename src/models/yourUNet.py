@@ -5,13 +5,7 @@ import torch
 import torch.nn as nn
 from src.models.CNNBaseModel import CNNBaseModel
 
-'''
-TODO
-
-Ajouter du code ici pour faire fonctionner le réseau YourUNet.  Un réseau inspiré de UNet
-mais comprenant des connexions résiduelles et denses.  Soyez originaux et surtout... amusez-vous!
-
-'''
+# Authors: Hassan Kajila
 
 class YourUNet(CNNBaseModel):
     """
@@ -163,6 +157,3 @@ class YourUNet(CNNBaseModel):
             nn.Conv2d(mid_channels, out_channels, 1)
         )
 
-'''
-Fin de votre code.
-'''

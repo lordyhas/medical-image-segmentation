@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from src.models.CNNBaseModel import CNNBaseModel
 from src.models.CNNBlocks import ResidualBlock, DenseBlock, BottleneckBlock
-
+# Author : Hassan Kajila
 '''
 Réseau YourSegNet amélioré avec:
 - Blocs résiduels
@@ -166,7 +166,3 @@ class YourSegNet(CNNBaseModel):
             nn.ReLU()
         )
 
-
-'''
-Fin de votre code.
-'''
